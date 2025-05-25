@@ -1,10 +1,12 @@
 {
-  "name": "anki-mcp",
-  "version": "1.0.0",
+  "name": "@arielbk/anki-mcp",
+  "version": "0.1.1",
   "description": "MCP server for integrating with Anki flashcards",
   "type": "module",
   "main": "dist/index.js",
-  "bin": "dist/cli.js",
+  "bin": {
+    "anki-mcp": "dist/index.js"
+  },
   "files": [
     "dist"
   ],
@@ -14,7 +16,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "start": "node dist/index.js",
-    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "prepublishOnly": "pnpm build"
   },
   "keywords": [
     "anki",
@@ -22,7 +25,7 @@
     "flashcards",
     "ankiconnect"
   ],
-  "author": "",
+  "author": "arielbk",
   "license": "MIT",
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
