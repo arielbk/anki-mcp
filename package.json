@@ -1,0 +1,43 @@
+{
+  "name": "anki-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for integrating with Anki flashcards",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": "dist/cli.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "start": "node dist/index.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "keywords": [
+    "anki",
+    "mcp",
+    "flashcards",
+    "ankiconnect"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.10.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.32.1",
+    "@typescript-eslint/parser": "^8.32.1",
+    "eslint": "^9.27.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.4.0",
+    "prettier": "^3.5.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  }
+}
