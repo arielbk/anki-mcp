@@ -1,0 +1,3 @@
+import { YankiConnect } from 'yanki-connect';
+
+export const ankiClient = new YankiConnect();
