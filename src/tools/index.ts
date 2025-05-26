@@ -6,3 +6,4 @@ export { registerMediaTools } from './media.js';
 export { registerMiscellaneousTools } from './miscellaneous.js';
 export { registerModelTools } from './model.js';
 export { registerStatisticTools } from './statistic.js';
+export { registerBulkTools } from './bulk.js';

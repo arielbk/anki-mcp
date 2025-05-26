@@ -16,6 +16,7 @@ import {
   registerMiscellaneousTools,
   registerModelTools,
   registerStatisticTools,
+  registerBulkTools,
 } from './tools/index.js';
 
 const server = new McpServer({
@@ -47,6 +48,9 @@ registerStatisticTools(server);
 registerGraphicalTools(server);
 registerMediaTools(server);
 registerMiscellaneousTools(server);
+
+// Register bulk operation tools
+registerBulkTools(server);
 
 // Start receiving messages on stdin and sending messages on stdout
 const transport = new StdioServerTransport();
