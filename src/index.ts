@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { registerDeckResources } from './resources/index.js';
-import { registerDeckTools } from './tools/index.js';
+import { registerDeckResources, registerCardResources } from './resources/index.js';
+import { registerDeckTools, registerCardTools } from './tools/index.js';
 
 const server = new McpServer({
   name: 'Anki MCP Server',
@@ -11,6 +11,10 @@ const server = new McpServer({
 // Register all deck resources and tools
 registerDeckResources(server);
 registerDeckTools(server);
+
+// Register all card resources and tools
+registerCardResources(server);
+registerCardTools(server);
 
 // Start receiving messages on stdin and sending messages on stdout
 const transport = new StdioServerTransport();

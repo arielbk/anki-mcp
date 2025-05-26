@@ -24,7 +24,9 @@ export function registerDeckTools(server: McpServer) {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to create deck "${deckName}": ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to create deck "${deckName}": ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   );
@@ -34,13 +36,16 @@ export function registerDeckTools(server: McpServer) {
     'delete_decks',
     {
       deckNames: z.array(z.string()).describe('Array of deck names to delete'),
-      deleteCards: z.boolean().default(true).describe('Whether to delete the cards in the decks as well'),
+      deleteCards: z
+        .boolean()
+        .default(true)
+        .describe('Whether to delete the cards in the decks as well'),
     },
     async ({ deckNames, deleteCards }) => {
       try {
-        await ankiClient.deck.deleteDecks({ 
+        await ankiClient.deck.deleteDecks({
           decks: deckNames,
-          cardsToo: deleteCards as true // Type assertion needed due to yanki-connect's strict typing
+          cardsToo: deleteCards as true, // Type assertion needed due to yanki-connect's strict typing
         });
         return {
           content: [
@@ -51,7 +56,9 @@ export function registerDeckTools(server: McpServer) {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to delete decks "${deckNames.join(', ')}": ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to delete decks "${deckNames.join(', ')}": ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   );
@@ -65,9 +72,9 @@ export function registerDeckTools(server: McpServer) {
     },
     async ({ cardIds, targetDeck }) => {
       try {
-        await ankiClient.deck.changeDeck({ 
+        await ankiClient.deck.changeDeck({
           cards: cardIds,
-          deck: targetDeck
+          deck: targetDeck,
         });
         return {
           content: [
@@ -78,7 +85,9 @@ export function registerDeckTools(server: McpServer) {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to move cards to deck "${targetDeck}": ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to move cards to deck "${targetDeck}": ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   );
@@ -92,11 +101,11 @@ export function registerDeckTools(server: McpServer) {
     },
     async ({ sourceConfigId, newConfigName }) => {
       try {
-        const result = await ankiClient.deck.cloneDeckConfigId({ 
+        const result = await ankiClient.deck.cloneDeckConfigId({
           cloneFrom: sourceConfigId,
-          name: newConfigName
+          name: newConfigName,
         });
-        
+
         if (result === false) {
           throw new Error('Failed to clone deck configuration - operation returned false');
         }
@@ -110,7 +119,9 @@ export function registerDeckTools(server: McpServer) {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to clone deck configuration: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to clone deck configuration: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   );
@@ -124,7 +135,7 @@ export function registerDeckTools(server: McpServer) {
     async ({ configId }) => {
       try {
         const result = await ankiClient.deck.removeDeckConfigId({ configId });
-        
+
         if (!result) {
           throw new Error('Failed to remove deck configuration - operation returned false');
         }
@@ -138,7 +149,9 @@ export function registerDeckTools(server: McpServer) {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to remove deck configuration: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to remove deck configuration: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   );
@@ -147,47 +160,49 @@ export function registerDeckTools(server: McpServer) {
   server.tool(
     'save_deck_config',
     {
-      config: z.object({
-        id: z.number(),
-        name: z.string(),
-        autoplay: z.boolean(),
-        dyn: z.boolean(),
-        maxTaken: z.number(),
-        mod: z.number(),
-        replayq: z.boolean(),
-        timer: z.number(),
-        usn: z.number(),
-        lapse: z.object({
-          delays: z.array(z.number()),
-          leechAction: z.number(),
-          leechFails: z.number(),
-          minInt: z.number(),
-          mult: z.number(),
-        }),
-        new: z.object({
-          bury: z.boolean(),
-          delays: z.array(z.number()),
-          initialFactor: z.number(),
-          ints: z.array(z.number()),
-          order: z.number(),
-          perDay: z.number(),
-          separate: z.boolean(),
-        }),
-        rev: z.object({
-          bury: z.boolean(),
-          ease4: z.number(),
-          fuzz: z.number(),
-          ivlFct: z.number(),
-          maxIvl: z.number(),
-          minSpace: z.number(),
-          perDay: z.number(),
-        }),
-      }).describe('Complete deck configuration object to save'),
+      config: z
+        .object({
+          id: z.number(),
+          name: z.string(),
+          autoplay: z.boolean(),
+          dyn: z.boolean(),
+          maxTaken: z.number(),
+          mod: z.number(),
+          replayq: z.boolean(),
+          timer: z.number(),
+          usn: z.number(),
+          lapse: z.object({
+            delays: z.array(z.number()),
+            leechAction: z.number(),
+            leechFails: z.number(),
+            minInt: z.number(),
+            mult: z.number(),
+          }),
+          new: z.object({
+            bury: z.boolean(),
+            delays: z.array(z.number()),
+            initialFactor: z.number(),
+            ints: z.array(z.number()),
+            order: z.number(),
+            perDay: z.number(),
+            separate: z.boolean(),
+          }),
+          rev: z.object({
+            bury: z.boolean(),
+            ease4: z.number(),
+            fuzz: z.number(),
+            ivlFct: z.number(),
+            maxIvl: z.number(),
+            minSpace: z.number(),
+            perDay: z.number(),
+          }),
+        })
+        .describe('Complete deck configuration object to save'),
     },
     async ({ config }) => {
       try {
         const result = await ankiClient.deck.saveDeckConfig({ config });
-        
+
         if (!result) {
           throw new Error('Failed to save deck configuration - operation returned false');
         }
@@ -201,7 +216,9 @@ export function registerDeckTools(server: McpServer) {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to save deck configuration: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to save deck configuration: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   );
@@ -215,11 +232,11 @@ export function registerDeckTools(server: McpServer) {
     },
     async ({ configId, deckNames }) => {
       try {
-        const result = await ankiClient.deck.setDeckConfigId({ 
+        const result = await ankiClient.deck.setDeckConfigId({
           configId,
-          decks: deckNames
+          decks: deckNames,
         });
-        
+
         if (!result) {
           throw new Error('Failed to set deck configuration - operation returned false');
         }
@@ -233,7 +250,9 @@ export function registerDeckTools(server: McpServer) {
           ],
         };
       } catch (error) {
-        throw new Error(`Failed to set deck configuration: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to set deck configuration: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   );
