@@ -42,7 +42,7 @@ export function registerCardResources(server: McpServer) {
       try {
         const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
         const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-        
+
         if (cardIds.some((id: number) => isNaN(id))) {
           throw new Error('Invalid card IDs provided');
         }
@@ -73,7 +73,7 @@ export function registerCardResources(server: McpServer) {
       try {
         const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
         const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-        
+
         if (cardIds.some((id: number) => isNaN(id))) {
           throw new Error('Invalid card IDs provided');
         }
@@ -81,7 +81,7 @@ export function registerCardResources(server: McpServer) {
         const areDue = await ankiClient.card.areDue({ cards: cardIds });
         const result = cardIds.map((cardId: number, index: number) => ({
           cardId,
-          isDue: areDue[index]
+          isDue: areDue[index],
         }));
 
         return {
@@ -109,7 +109,7 @@ export function registerCardResources(server: McpServer) {
       try {
         const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
         const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-        
+
         if (cardIds.some((id: number) => isNaN(id))) {
           throw new Error('Invalid card IDs provided');
         }
@@ -117,7 +117,7 @@ export function registerCardResources(server: McpServer) {
         const areSuspended = await ankiClient.card.areSuspended({ cards: cardIds });
         const result = cardIds.map((cardId: number, index: number) => ({
           cardId,
-          isSuspended: areSuspended[index]
+          isSuspended: areSuspended[index],
         }));
 
         return {
@@ -145,7 +145,7 @@ export function registerCardResources(server: McpServer) {
       try {
         const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
         const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-        
+
         if (cardIds.some((id: number) => isNaN(id))) {
           throw new Error('Invalid card IDs provided');
         }
@@ -176,7 +176,7 @@ export function registerCardResources(server: McpServer) {
       try {
         const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
         const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-        
+
         if (cardIds.some((id: number) => isNaN(id))) {
           throw new Error('Invalid card IDs provided');
         }
@@ -207,7 +207,7 @@ export function registerCardResources(server: McpServer) {
       try {
         const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
         const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-        
+
         if (cardIds.some((id: number) => isNaN(id))) {
           throw new Error('Invalid card IDs provided');
         }
@@ -215,7 +215,7 @@ export function registerCardResources(server: McpServer) {
         const easeFactors = await ankiClient.card.getEaseFactors({ cards: cardIds });
         const result = cardIds.map((cardId: number, index: number) => ({
           cardId,
-          easeFactor: easeFactors[index]
+          easeFactor: easeFactors[index],
         }));
 
         return {
@@ -243,7 +243,7 @@ export function registerCardResources(server: McpServer) {
       try {
         const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
         const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-        
+
         if (cardIds.some((id: number) => isNaN(id))) {
           throw new Error('Invalid card IDs provided');
         }
@@ -255,7 +255,7 @@ export function registerCardResources(server: McpServer) {
         const intervals = await ankiClient.card.getIntervals({ cards: cardIds, complete });
         const result = cardIds.map((cardId: number, index: number) => ({
           cardId,
-          intervals: intervals[index]
+          intervals: intervals[index],
         }));
 
         return {

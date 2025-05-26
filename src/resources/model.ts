@@ -189,7 +189,9 @@ export function registerModelResources(server: McpServer) {
       }
 
       try {
-        const fieldsOnTemplates = await ankiClient.model.modelFieldsOnTemplates({ modelName: modelNameString });
+        const fieldsOnTemplates = await ankiClient.model.modelFieldsOnTemplates({
+          modelName: modelNameString,
+        });
         return {
           contents: [
             {

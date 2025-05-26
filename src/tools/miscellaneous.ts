@@ -10,7 +10,11 @@ export function registerMiscellaneousTools(server: McpServer) {
   server.tool(
     'api_reflect',
     {
-      actions: z.array(z.string()).nullable().optional().describe('List of action names to reflect, or null for all'),
+      actions: z
+        .array(z.string())
+        .nullable()
+        .optional()
+        .describe('List of action names to reflect, or null for all'),
       scopes: z.array(z.enum(['actions'])).describe('Scopes to reflect'),
     },
     async ({ actions = null, scopes }) => {
@@ -63,50 +67,42 @@ export function registerMiscellaneousTools(server: McpServer) {
   );
 
   // Tool: Get the active profile name
-  server.tool(
-    'get_active_profile',
-    {},
-    async () => {
-      try {
-        const profileName = await ankiClient.miscellaneous.getActiveProfile();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Active profile: ${profileName}`,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to get active profile: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('get_active_profile', {}, async () => {
+    try {
+      const profileName = await ankiClient.miscellaneous.getActiveProfile();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Active profile: ${profileName}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get active profile: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Get all available profiles
-  server.tool(
-    'get_profiles',
-    {},
-    async () => {
-      try {
-        const profiles = await ankiClient.miscellaneous.getProfiles();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Available profiles: ${JSON.stringify(profiles, null, 2)}`,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to get profiles: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('get_profiles', {}, async () => {
+    try {
+      const profiles = await ankiClient.miscellaneous.getProfiles();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Available profiles: ${JSON.stringify(profiles, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get profiles: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Import a package
   server.tool(
@@ -162,21 +158,25 @@ export function registerMiscellaneousTools(server: McpServer) {
   server.tool(
     'multi',
     {
-      actions: z.array(z.object({
-        action: z.string().describe('Name of the action to execute'),
-        params: z.any().optional().describe('Parameters for the action'),
-        version: z.number().optional().describe('API version for the action'),
-      })).describe('Array of actions to execute'),
+      actions: z
+        .array(
+          z.object({
+            action: z.string().describe('Name of the action to execute'),
+            params: z.any().optional().describe('Parameters for the action'),
+            version: z.number().optional().describe('API version for the action'),
+          })
+        )
+        .describe('Array of actions to execute'),
     },
     async ({ actions }) => {
       try {
         // Type assertion needed due to yanki-connect's strict typing for action names
-        const results = await ankiClient.miscellaneous.multi({ 
+        const results = await ankiClient.miscellaneous.multi({
           actions: actions as Array<{
             action: any;
             params?: any;
             version?: number;
-          }>
+          }>,
         });
         return {
           content: [
@@ -195,94 +195,76 @@ export function registerMiscellaneousTools(server: McpServer) {
   );
 
   // Tool: Reload the collection
-  server.tool(
-    'reload_collection',
-    {},
-    async () => {
-      try {
-        await ankiClient.miscellaneous.reloadCollection();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Successfully reloaded collection',
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to reload collection: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('reload_collection', {}, async () => {
+    try {
+      await ankiClient.miscellaneous.reloadCollection();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Successfully reloaded collection',
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to reload collection: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Request permission from AnkiConnect
-  server.tool(
-    'request_permission',
-    {},
-    async () => {
-      try {
-        const permission = await ankiClient.miscellaneous.requestPermission();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Permission request result: ${JSON.stringify(permission, null, 2)}`,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to request permission: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('request_permission', {}, async () => {
+    try {
+      const permission = await ankiClient.miscellaneous.requestPermission();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Permission request result: ${JSON.stringify(permission, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to request permission: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Sync the collection
-  server.tool(
-    'sync',
-    {},
-    async () => {
-      try {
-        await ankiClient.miscellaneous.sync();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Successfully initiated sync',
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to sync: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('sync', {}, async () => {
+    try {
+      await ankiClient.miscellaneous.sync();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Successfully initiated sync',
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Failed to sync: ${error instanceof Error ? error.message : String(error)}`);
     }
-  );
+  });
 
   // Tool: Get AnkiConnect version
-  server.tool(
-    'get_version',
-    {},
-    async () => {
-      try {
-        const version = await ankiClient.miscellaneous.version();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `AnkiConnect version: ${version}`,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to get version: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('get_version', {}, async () => {
+    try {
+      const version = await ankiClient.miscellaneous.version();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `AnkiConnect version: ${version}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get version: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 }

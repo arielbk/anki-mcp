@@ -12,7 +12,9 @@ export function registerNoteTools(server: McpServer) {
     {
       deckName: z.string().describe('Name of the deck to add the note to'),
       modelName: z.string().describe('Name of the note model/type (e.g., "Basic", "Cloze")'),
-      fields: z.record(z.string()).describe('Object with field names as keys and field content as values'),
+      fields: z
+        .record(z.string())
+        .describe('Object with field names as keys and field content as values'),
       tags: z.array(z.string()).optional().describe('Array of tags to add to the note'),
     },
     async ({ deckName, modelName, fields, tags }) => {
@@ -25,7 +27,7 @@ export function registerNoteTools(server: McpServer) {
         };
 
         const noteId = await ankiClient.note.addNote({ note });
-        
+
         if (noteId === null) {
           throw new Error('Failed to add note - possibly a duplicate or invalid fields');
         }
@@ -50,23 +52,29 @@ export function registerNoteTools(server: McpServer) {
   server.tool(
     'add_notes',
     {
-      notes: z.array(z.object({
-        deckName: z.string().describe('Name of the deck to add the note to'),
-        modelName: z.string().describe('Name of the note model/type'),
-        fields: z.record(z.string()).describe('Object with field names as keys and field content as values'),
-        tags: z.array(z.string()).optional().describe('Array of tags to add to the note'),
-      })).describe('Array of notes to add'),
+      notes: z
+        .array(
+          z.object({
+            deckName: z.string().describe('Name of the deck to add the note to'),
+            modelName: z.string().describe('Name of the note model/type'),
+            fields: z
+              .record(z.string())
+              .describe('Object with field names as keys and field content as values'),
+            tags: z.array(z.string()).optional().describe('Array of tags to add to the note'),
+          })
+        )
+        .describe('Array of notes to add'),
     },
     async ({ notes }) => {
       try {
-        const formattedNotes = notes.map(note => ({
+        const formattedNotes = notes.map((note) => ({
           ...note,
           tags: note.tags || [],
         }));
 
         const results = await ankiClient.note.addNotes({ notes: formattedNotes });
-        
-        const successCount = results?.filter(result => result !== null).length || 0;
+
+        const successCount = results?.filter((result) => result !== null).length || 0;
         const failureCount = (results?.length || 0) - successCount;
 
         return {
@@ -90,7 +98,10 @@ export function registerNoteTools(server: McpServer) {
     'update_note',
     {
       noteId: z.number().describe('ID of the note to update'),
-      fields: z.record(z.string()).optional().describe('Object with field names as keys and new field content as values'),
+      fields: z
+        .record(z.string())
+        .optional()
+        .describe('Object with field names as keys and new field content as values'),
       tags: z.array(z.string()).optional().describe('Array of tags to set for the note'),
     },
     async ({ noteId, fields, tags }) => {
@@ -238,19 +249,22 @@ export function registerNoteTools(server: McpServer) {
     'find_notes',
     {
       query: z.string().describe('Anki search query to find notes'),
-      includeInfo: z.boolean().default(false).describe('Whether to include detailed note information'),
+      includeInfo: z
+        .boolean()
+        .default(false)
+        .describe('Whether to include detailed note information'),
       limit: z.number().default(50).describe('Maximum number of notes to return detailed info for'),
     },
     async ({ query, includeInfo, limit }) => {
       try {
         const noteIds = await ankiClient.note.findNotes({ query });
-        
+
         let result = `Found ${noteIds.length} notes matching query: "${query}"`;
-        
+
         if (includeInfo && noteIds.length > 0) {
           const limitedIds = noteIds.slice(0, limit);
           const notesInfo = await ankiClient.note.notesInfo({ notes: limitedIds });
-          
+
           result += `\n\nDetailed information for first ${limitedIds.length} notes:\n${JSON.stringify(notesInfo, null, 2)}`;
         } else {
           result += `\n\nNote IDs: [${noteIds.join(', ')}]`;
@@ -276,23 +290,29 @@ export function registerNoteTools(server: McpServer) {
   server.tool(
     'can_add_notes',
     {
-      notes: z.array(z.object({
-        deckName: z.string().describe('Name of the deck to add the note to'),
-        modelName: z.string().describe('Name of the note model/type'),
-        fields: z.record(z.string()).describe('Object with field names as keys and field content as values'),
-        tags: z.array(z.string()).optional().describe('Array of tags to add to the note'),
-      })).describe('Array of notes to validate'),
+      notes: z
+        .array(
+          z.object({
+            deckName: z.string().describe('Name of the deck to add the note to'),
+            modelName: z.string().describe('Name of the note model/type'),
+            fields: z
+              .record(z.string())
+              .describe('Object with field names as keys and field content as values'),
+            tags: z.array(z.string()).optional().describe('Array of tags to add to the note'),
+          })
+        )
+        .describe('Array of notes to validate'),
     },
     async ({ notes }) => {
       try {
-        const formattedNotes = notes.map(note => ({
+        const formattedNotes = notes.map((note) => ({
           ...note,
           tags: note.tags || [],
         }));
 
         const canAddResults = await ankiClient.note.canAddNotes({ notes: formattedNotes });
-        
-        const validCount = canAddResults.filter(result => result).length;
+
+        const validCount = canAddResults.filter((result) => result).length;
         const invalidCount = canAddResults.length - validCount;
 
         return {
@@ -312,50 +332,42 @@ export function registerNoteTools(server: McpServer) {
   );
 
   // Tool: Clear unused tags
-  server.tool(
-    'clear_unused_tags',
-    {},
-    async () => {
-      try {
-        const removedTags = await ankiClient.note.clearUnusedTags();
+  server.tool('clear_unused_tags', {}, async () => {
+    try {
+      const removedTags = await ankiClient.note.clearUnusedTags();
 
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Successfully cleared ${removedTags.length} unused tags: [${removedTags.join(', ')}]`,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to clear unused tags: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Successfully cleared ${removedTags.length} unused tags: [${removedTags.join(', ')}]`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to clear unused tags: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Remove empty notes
-  server.tool(
-    'remove_empty_notes',
-    {},
-    async () => {
-      try {
-        await ankiClient.note.removeEmptyNotes();
+  server.tool('remove_empty_notes', {}, async () => {
+    try {
+      await ankiClient.note.removeEmptyNotes();
 
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Successfully removed all empty notes from the collection',
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to remove empty notes: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Successfully removed all empty notes from the collection',
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to remove empty notes: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 }

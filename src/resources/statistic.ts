@@ -6,57 +6,67 @@ import { ankiClient } from '../utils/ankiClient.js';
  */
 export function registerStatisticResources(server: McpServer) {
   // Static resource: Get number of cards reviewed by day
-  server.resource('cards_reviewed_by_day', 'anki:///statistics/cards-reviewed-by-day', async (uri) => {
-    try {
-      const reviewsByDay = await ankiClient.statistic.getNumCardsReviewedByDay();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(reviewsByDay, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get cards reviewed by day: ${error instanceof Error ? error.message : String(error)}`
-      );
+  server.resource(
+    'cards_reviewed_by_day',
+    'anki:///statistics/cards-reviewed-by-day',
+    async (uri) => {
+      try {
+        const reviewsByDay = await ankiClient.statistic.getNumCardsReviewedByDay();
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'application/json',
+              text: JSON.stringify(reviewsByDay, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to get cards reviewed by day: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  });
+  );
 
   // Static resource: Get number of cards reviewed today
-  server.resource('cards_reviewed_today', 'anki:///statistics/cards-reviewed-today', async (uri) => {
-    try {
-      const reviewsToday = await ankiClient.statistic.getNumCardsReviewedToday();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify({ cardsReviewedToday: reviewsToday }, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get cards reviewed today: ${error instanceof Error ? error.message : String(error)}`
-      );
+  server.resource(
+    'cards_reviewed_today',
+    'anki:///statistics/cards-reviewed-today',
+    async (uri) => {
+      try {
+        const reviewsToday = await ankiClient.statistic.getNumCardsReviewedToday();
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'application/json',
+              text: JSON.stringify({ cardsReviewedToday: reviewsToday }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to get cards reviewed today: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  });
+  );
 
   // Resource template: Get card reviews for a deck
   server.resource(
     'card_reviews',
-    new ResourceTemplate('anki:///statistics/decks/{deckName}/reviews/{startID}', { list: undefined }),
+    new ResourceTemplate('anki:///statistics/decks/{deckName}/reviews/{startID}', {
+      list: undefined,
+    }),
     async (uri, { deckName, startID }) => {
       const deckNameString = Array.isArray(deckName) ? deckName[0] : deckName;
       const startIDString = Array.isArray(startID) ? startID[0] : startID;
-      
+
       if (!deckNameString) {
         throw new Error('Deck name is required');
       }
-      
+
       if (!startIDString) {
         throw new Error('Start ID is required');
       }
@@ -67,9 +77,9 @@ export function registerStatisticResources(server: McpServer) {
       }
 
       try {
-        const reviews = await ankiClient.statistic.cardReviews({ 
-          deck: deckNameString, 
-          startID: startIDNumber 
+        const reviews = await ankiClient.statistic.cardReviews({
+          deck: deckNameString,
+          startID: startIDNumber,
         });
         return {
           contents: [
@@ -91,7 +101,9 @@ export function registerStatisticResources(server: McpServer) {
   // Resource template: Get latest review ID for a deck
   server.resource(
     'latest_review_id',
-    new ResourceTemplate('anki:///statistics/decks/{deckName}/latest-review-id', { list: undefined }),
+    new ResourceTemplate('anki:///statistics/decks/{deckName}/latest-review-id', {
+      list: undefined,
+    }),
     async (uri, { deckName }) => {
       const deckNameString = Array.isArray(deckName) ? deckName[0] : deckName;
       if (!deckNameString) {
@@ -105,11 +117,15 @@ export function registerStatisticResources(server: McpServer) {
             {
               uri: uri.href,
               mimeType: 'application/json',
-              text: JSON.stringify({ 
-                deck: deckNameString, 
-                latestReviewID: reviewID,
-                hasReviews: reviewID > 0
-              }, null, 2),
+              text: JSON.stringify(
+                {
+                  deck: deckNameString,
+                  latestReviewID: reviewID,
+                  hasReviews: reviewID > 0,
+                },
+                null,
+                2
+              ),
             },
           ],
         };
@@ -160,7 +176,9 @@ export function registerStatisticResources(server: McpServer) {
     'collection_stats_html',
     new ResourceTemplate('anki:///statistics/collection/{wholeCollection}', { list: undefined }),
     async (uri, { wholeCollection }) => {
-      const wholeCollectionString = Array.isArray(wholeCollection) ? wholeCollection[0] : wholeCollection;
+      const wholeCollectionString = Array.isArray(wholeCollection)
+        ? wholeCollection[0]
+        : wholeCollection;
       if (!wholeCollectionString) {
         throw new Error('wholeCollection parameter is required (true/false)');
       }
@@ -168,8 +186,8 @@ export function registerStatisticResources(server: McpServer) {
       const isWholeCollection = wholeCollectionString.toLowerCase() === 'true';
 
       try {
-        const statsHTML = await ankiClient.statistic.getCollectionStatsHTML({ 
-          wholeCollection: isWholeCollection 
+        const statsHTML = await ankiClient.statistic.getCollectionStatsHTML({
+          wholeCollection: isWholeCollection,
         });
         return {
           contents: [

@@ -1,21 +1,21 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { 
-  registerDeckResources, 
-  registerCardResources, 
+import {
+  registerDeckResources,
+  registerCardResources,
   registerNoteResources,
   registerModelResources,
-  registerStatisticResources
+  registerStatisticResources,
 } from './resources/index.js';
-import { 
-  registerDeckTools, 
-  registerCardTools, 
+import {
+  registerDeckTools,
+  registerCardTools,
   registerNoteTools,
   registerGraphicalTools,
   registerMediaTools,
   registerMiscellaneousTools,
   registerModelTools,
-  registerStatisticTools
+  registerStatisticTools,
 } from './tools/index.js';
 
 const server = new McpServer({

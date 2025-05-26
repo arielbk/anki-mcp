@@ -140,7 +140,7 @@ export function registerCardTools(server: McpServer) {
           isSuspended: areSuspended[index],
         }));
 
-        const suspendedCount = areSuspended.filter(status => status === true).length;
+        const suspendedCount = areSuspended.filter((status) => status === true).length;
         return {
           content: [
             {

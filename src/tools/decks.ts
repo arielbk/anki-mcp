@@ -256,5 +256,4 @@ export function registerDeckTools(server: McpServer) {
       }
     }
   );
-
 }

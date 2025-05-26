@@ -91,54 +91,46 @@ export function registerStatisticTools(server: McpServer) {
   );
 
   // Tool: Get number of cards reviewed by day
-  server.tool(
-    'get_num_cards_reviewed_by_day',
-    {},
-    async () => {
-      try {
-        const reviewsByDay = await ankiClient.statistic.getNumCardsReviewedByDay();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Cards reviewed by day (${reviewsByDay.length} days):`,
-            },
-            {
-              type: 'text',
-              text: JSON.stringify(reviewsByDay, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to get cards reviewed by day: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('get_num_cards_reviewed_by_day', {}, async () => {
+    try {
+      const reviewsByDay = await ankiClient.statistic.getNumCardsReviewedByDay();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Cards reviewed by day (${reviewsByDay.length} days):`,
+          },
+          {
+            type: 'text',
+            text: JSON.stringify(reviewsByDay, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get cards reviewed by day: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Get number of cards reviewed today
-  server.tool(
-    'get_num_cards_reviewed_today',
-    {},
-    async () => {
-      try {
-        const reviewsToday = await ankiClient.statistic.getNumCardsReviewedToday();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Number of cards reviewed today: ${reviewsToday}`,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to get number of cards reviewed today: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('get_num_cards_reviewed_today', {}, async () => {
+    try {
+      const reviewsToday = await ankiClient.statistic.getNumCardsReviewedToday();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Number of cards reviewed today: ${reviewsToday}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get number of cards reviewed today: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Get reviews of specific cards
   server.tool(

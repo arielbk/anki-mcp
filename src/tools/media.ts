@@ -32,27 +32,23 @@ export function registerMediaTools(server: McpServer) {
   );
 
   // Tool: Get the media directory path
-  server.tool(
-    'get_media_dir_path',
-    {},
-    async () => {
-      try {
-        const path = await ankiClient.media.getMediaDirPath();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Media directory path: ${path}`,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to get media directory path: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+  server.tool('get_media_dir_path', {}, async () => {
+    try {
+      const path = await ankiClient.media.getMediaDirPath();
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Media directory path: ${path}`,
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get media directory path: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
+  });
 
   // Tool: Get media file names matching a pattern
   server.tool(
@@ -122,7 +118,10 @@ export function registerMediaTools(server: McpServer) {
       data: z.string().optional().describe('Base64-encoded data of the file'),
       path: z.string().optional().describe('Local file path to read from'),
       url: z.string().optional().describe('URL to download the file from'),
-      deleteExisting: z.boolean().optional().describe('Whether to delete existing file with same name'),
+      deleteExisting: z
+        .boolean()
+        .optional()
+        .describe('Whether to delete existing file with same name'),
     },
     async ({ filename, data, path, url, deleteExisting }) => {
       try {
