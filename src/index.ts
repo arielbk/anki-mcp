@@ -1,89 +1,39 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ListToolsRequestSchema,
-  ReadResourceRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { ankiClient } from './utils/ankiClient.js';
 
-const server = new Server(
-  {
-    name: 'Anki MCP Server',
-    version: '0.1.0',
-    description: 'MCP server for integrating with Anki flashcards',
-  },
-  {
-    capabilities: {
-      resources: {},
-      tools: {},
-    },
-  }
-);
-
-// List available resources
-server.setRequestHandler(ListResourcesRequestSchema, async () => {
-  return {
-    resources: [{ uri: 'anki:///deck/get_decks', name: 'Get Decks' }],
-  };
+const server = new McpServer({
+  name: 'Anki MCP Server',
+  version: '0.1.0',
 });
 
-// Read resource contents
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-  const uri = request.params.uri;
-
-  if (uri === 'anki:///deck/get_decks') {
-    // Fetch the list of decks from Anki
-    const decks = await ankiClient.deck.deckNames();
-    return {
-      contents: [
-        {
-          uri,
-          mimeType: 'text/plain',
-          text: decks.join('\n'),
-        },
-      ],
-    };
-  }
-
-  throw new Error('Resource not found');
-});
-
-// Define available tools
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+// Define the "Get Decks" resource
+server.resource('get_decks', 'anki:///deck/get_decks', async (uri) => {
+  // Fetch the list of decks from Anki
+  const decks = await ankiClient.deck.deckNames();
   return {
-    tools: [
+    contents: [
       {
-        name: 'create_deck',
-        description: 'Create a new Anki deck',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            deckName: { type: 'string' },
-          },
-          required: ['deckName'],
-        },
+        uri: uri.href,
+        mimeType: 'text/plain',
+        text: decks.join('\n'),
       },
     ],
   };
 });
 
-// Handle tool execution
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name === 'create_deck') {
-    const { deckName } = request.params.arguments as { deckName: string };
-    await ankiClient.deck.createDeck({ deck: deckName });
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Deck "${deckName}" created successfully.`,
-        },
-      ],
-    };
-  }
-  throw new Error('Tool not found');
+// Define the "Create Deck" tool
+server.tool('create_deck', { deckName: z.string() }, async ({ deckName }) => {
+  await ankiClient.deck.createDeck({ deck: deckName });
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Deck "${deckName}" created successfully.`,
+      },
+    ],
+  };
 });
 
 // Start receiving messages on stdin and sending messages on stdout
