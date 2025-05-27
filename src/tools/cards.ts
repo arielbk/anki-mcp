@@ -1,11 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ankiClient } from '../utils/ankiClient.js';
-import {
-  executeBulkOperation,
-  formatBulkOperationResult,
-  type BulkOperationResult,
-} from '../utils/bulkOperations.js';
 
 /**
  * Register all card-related tools with the MCP server
@@ -520,88 +515,6 @@ export function registerCardTools(server: McpServer) {
       } catch (error) {
         throw new Error(
           `Failed to set card values: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-  );
-
-  // ===============================
-  // BULK CARD OPERATIONS
-  // ===============================
-
-  // Tool: Bulk move cards to deck
-  server.tool(
-    'bulk_move_cards_to_deck',
-    {
-      cardIds: z.array(z.number()).describe('Array of card IDs to move'),
-      deckName: z.string().describe('Name of the destination deck'),
-    },
-    async ({ cardIds, deckName }) => {
-      try {
-        const result = await executeBulkOperation(
-          cardIds,
-          async (cardId) => {
-            await ankiClient.deck.changeDeck({
-              cards: [cardId],
-              deck: deckName,
-            });
-          },
-          (cardId) => `Card-${cardId}`
-        );
-
-        const message = formatBulkOperationResult(result, `Bulk move cards to deck "${deckName}"`);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: message,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to bulk move cards to deck: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-  );
-
-  // Tool: Bulk suspend/unsuspend cards
-  server.tool(
-    'bulk_suspend_cards',
-    {
-      cardIds: z.array(z.number()).describe('Array of card IDs to suspend/unsuspend'),
-      suspend: z.boolean().describe('Whether to suspend (true) or unsuspend (false) the cards'),
-    },
-    async ({ cardIds, suspend }) => {
-      try {
-        const result = await executeBulkOperation(
-          cardIds,
-          async (cardId) => {
-            if (suspend) {
-              await ankiClient.card.suspend({ cards: [cardId] });
-            } else {
-              await ankiClient.card.unsuspend({ cards: [cardId] });
-            }
-          },
-          (cardId) => `Card-${cardId}`
-        );
-
-        const action = suspend ? 'suspend' : 'unsuspend';
-        const message = formatBulkOperationResult(result, `Bulk ${action} cards`);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: message,
-            },
-          ],
-        };
-      } catch (error) {
-        throw new Error(
-          `Failed to bulk ${suspend ? 'suspend' : 'unsuspend'} cards: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }

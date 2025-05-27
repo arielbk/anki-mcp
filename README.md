@@ -9,7 +9,7 @@ Transform your Anki flashcard experience with AI! This [MCP (Model Context Proto
 
 Imagine having an AI tutor that knows your entire flashcard collection and can:
 
-### 📚 **Interactive Learning**
+### 📚 **Interactive **Learning\*\*\*\*
 
 - _"Quiz me on Japanese vocabulary I haven't seen in 3 days"_
 - _"Test me on challenging cards from my medical deck"_
