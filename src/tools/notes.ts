@@ -1,6 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ankiClient } from '../utils/ankiClient.js';
+import {
+  executeBulkOperation,
+  formatBulkOperationResult,
+  type BulkOperationResult,
+} from '../utils/bulkOperations.js';
 
 /**
  * Register all note-related tools with the MCP server
@@ -370,4 +375,131 @@ export function registerNoteTools(server: McpServer) {
       );
     }
   });
+
+  // ===============================
+  // BULK NOTE OPERATIONS
+  // ===============================
+
+  // Tool: Bulk add tags to notes
+  server.tool(
+    'bulk_add_tags',
+    {
+      noteIds: z.array(z.number()).describe('Array of note IDs to add tags to'),
+      tags: z.array(z.string()).min(1).describe('Array of tags to add'),
+    },
+    async ({ noteIds, tags }) => {
+      try {
+        const tagsString = tags.join(' ');
+
+        const result = await executeBulkOperation(
+          noteIds,
+          async (noteId) => {
+            await ankiClient.note.addTags({
+              notes: [noteId],
+              tags: tagsString,
+            });
+          },
+          (noteId) => `Note-${noteId}`
+        );
+
+        const message = formatBulkOperationResult(result, `Bulk add tags [${tags.join(', ')}]`);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: message,
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to bulk add tags: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  );
+
+  // Tool: Bulk remove tags from notes
+  server.tool(
+    'bulk_remove_tags',
+    {
+      noteIds: z.array(z.number()).describe('Array of note IDs to remove tags from'),
+      tags: z.array(z.string()).min(1).describe('Array of tags to remove'),
+    },
+    async ({ noteIds, tags }) => {
+      try {
+        const tagsString = tags.join(' ');
+
+        const result = await executeBulkOperation(
+          noteIds,
+          async (noteId) => {
+            await ankiClient.note.removeTags({
+              notes: [noteId],
+              tags: tagsString,
+            });
+          },
+          (noteId) => `Note-${noteId}`
+        );
+
+        const message = formatBulkOperationResult(result, `Bulk remove tags [${tags.join(', ')}]`);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: message,
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to bulk remove tags: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  );
+
+  // Tool: Bulk update note fields
+  server.tool(
+    'bulk_update_note_fields',
+    {
+      noteIds: z.array(z.number()).describe('Array of note IDs to update'),
+      fields: z
+        .record(z.string())
+        .describe('Object with field names as keys and new content as values'),
+    },
+    async ({ noteIds, fields }) => {
+      try {
+        const result = await executeBulkOperation(
+          noteIds,
+          async (noteId) => {
+            await ankiClient.note.updateNoteFields({
+              note: {
+                id: noteId,
+                fields,
+              },
+            });
+          },
+          (noteId) => `Note-${noteId}`
+        );
+
+        const fieldsList = Object.keys(fields).join(', ');
+        const message = formatBulkOperationResult(result, `Bulk update fields [${fieldsList}]`);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: message,
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to bulk update note fields: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  );
 }

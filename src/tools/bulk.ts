@@ -43,7 +43,7 @@ async function executeBatchOperation<T>(
   // Process items in batches to avoid overwhelming AnkiConnect
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
-    
+
     // Execute operations in parallel within each batch
     const batchPromises = batch.map(async (item, batchIndex) => {
       const globalIndex = i + batchIndex;
@@ -71,10 +71,10 @@ async function executeBatchOperation<T>(
  */
 async function getNotesTags(noteIds: number[]): Promise<Map<number, string[]>> {
   const tagMap = new Map<number, string[]>();
-  
+
   try {
     const notesInfo = await ankiClient.note.notesInfo({ notes: noteIds });
-    
+
     for (const noteInfo of notesInfo) {
       if (noteInfo && noteInfo.noteId) {
         tagMap.set(noteInfo.noteId, noteInfo.tags || []);
@@ -82,9 +82,11 @@ async function getNotesTags(noteIds: number[]): Promise<Map<number, string[]>> {
     }
   } catch (error) {
     // If we can't get current tags, we can't support rollback for this operation
-    throw new Error(`Failed to get current tags for rollback support: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to get current tags for rollback support: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
-  
+
   return tagMap;
 }
 
@@ -99,7 +101,10 @@ export function registerBulkTools(server: McpServer) {
       noteIds: z.array(z.number()).describe('Array of note IDs to add tags to'),
       tags: z.array(z.string()).describe('Array of tags to add to all notes'),
       batchSize: z.number().default(50).describe('Number of operations to process in each batch'),
-      enableRollback: z.boolean().default(false).describe('Whether to enable rollback support (requires fetching current state first)'),
+      enableRollback: z
+        .boolean()
+        .default(false)
+        .describe('Whether to enable rollback support (requires fetching current state first)'),
     },
     async ({ noteIds, tags, batchSize, enableRollback }) => {
       try {
@@ -134,7 +139,7 @@ Total notes: ${result.totalOperations}
 Successful: ${result.successful}
 Failed: ${result.failed}${rollbackInfo}${
                 result.errors.length > 0
-                  ? `\n\nErrors:\n${result.errors.map(e => `Note ${e.noteId}: ${e.error}`).join('\n')}`
+                  ? `\n\nErrors:\n${result.errors.map((e) => `Note ${e.noteId}: ${e.error}`).join('\n')}`
                   : ''
               }`,
             },
@@ -155,7 +160,10 @@ Failed: ${result.failed}${rollbackInfo}${
       noteIds: z.array(z.number()).describe('Array of note IDs to remove tags from'),
       tags: z.array(z.string()).describe('Array of tags to remove from all notes'),
       batchSize: z.number().default(50).describe('Number of operations to process in each batch'),
-      enableRollback: z.boolean().default(false).describe('Whether to enable rollback support (requires fetching current state first)'),
+      enableRollback: z
+        .boolean()
+        .default(false)
+        .describe('Whether to enable rollback support (requires fetching current state first)'),
     },
     async ({ noteIds, tags, batchSize, enableRollback }) => {
       try {
@@ -190,7 +198,7 @@ Total notes: ${result.totalOperations}
 Successful: ${result.successful}
 Failed: ${result.failed}${rollbackInfo}${
                 result.errors.length > 0
-                  ? `\n\nErrors:\n${result.errors.map(e => `Note ${e.noteId}: ${e.error}`).join('\n')}`
+                  ? `\n\nErrors:\n${result.errors.map((e) => `Note ${e.noteId}: ${e.error}`).join('\n')}`
                   : ''
               }`,
             },
@@ -212,7 +220,10 @@ Failed: ${result.failed}${rollbackInfo}${
       tagToReplace: z.string().describe('Tag to replace'),
       replaceWithTag: z.string().describe('Tag to replace with'),
       batchSize: z.number().default(50).describe('Number of operations to process in each batch'),
-      enableRollback: z.boolean().default(false).describe('Whether to enable rollback support (requires fetching current state first)'),
+      enableRollback: z
+        .boolean()
+        .default(false)
+        .describe('Whether to enable rollback support (requires fetching current state first)'),
     },
     async ({ noteIds, tagToReplace, replaceWithTag, batchSize, enableRollback }) => {
       try {
@@ -250,7 +261,7 @@ Total notes: ${result.totalOperations}
 Successful: ${result.successful}
 Failed: ${result.failed}${rollbackInfo}${
                 result.errors.length > 0
-                  ? `\n\nErrors:\n${result.errors.map(e => `Note ${e.noteId}: ${e.error}`).join('\n')}`
+                  ? `\n\nErrors:\n${result.errors.map((e) => `Note ${e.noteId}: ${e.error}`).join('\n')}`
                   : ''
               }`,
             },
@@ -272,11 +283,16 @@ Failed: ${result.failed}${rollbackInfo}${
         .array(
           z.object({
             noteId: z.number().describe('ID of the note to update'),
-            fields: z.record(z.string()).describe('Object with field names as keys and new field content as values'),
+            fields: z
+              .record(z.string())
+              .describe('Object with field names as keys and new field content as values'),
           })
         )
         .describe('Array of note updates to apply'),
-      batchSize: z.number().default(25).describe('Number of operations to process in each batch (lower for field updates)'),
+      batchSize: z
+        .number()
+        .default(25)
+        .describe('Number of operations to process in each batch (lower for field updates)'),
     },
     async ({ updates, batchSize }) => {
       try {
@@ -302,7 +318,7 @@ Total notes: ${result.totalOperations}
 Successful: ${result.successful}
 Failed: ${result.failed}${
                 result.errors.length > 0
-                  ? `\n\nErrors:\n${result.errors.map(e => `Note ${e.noteId}: ${e.error}`).join('\n')}`
+                  ? `\n\nErrors:\n${result.errors.map((e) => `Note ${e.noteId}: ${e.error}`).join('\n')}`
                   : ''
               }`,
             },
@@ -347,7 +363,7 @@ Total cards: ${result.totalOperations}
 Successful: ${result.successful}
 Failed: ${result.failed}${
                 result.errors.length > 0
-                  ? `\n\nErrors:\n${result.errors.map(e => `Card ${e.noteId}: ${e.error}`).join('\n')}`
+                  ? `\n\nErrors:\n${result.errors.map((e) => `Card ${e.noteId}: ${e.error}`).join('\n')}`
                   : ''
               }`,
             },
@@ -368,8 +384,15 @@ Failed: ${result.failed}${
       noteIds: z.array(z.number()).describe('Array of note IDs to clean up tags for'),
       patterns: z
         .array(z.string())
-        .describe('Array of regex patterns to match tags for removal (e.g., ["^temp_.*", "^old_.*"])'),
-      dryRun: z.boolean().default(true).describe('Whether to perform a dry run (show what would be removed without actually removing)'),
+        .describe(
+          'Array of regex patterns to match tags for removal (e.g., ["^temp_.*", "^old_.*"])'
+        ),
+      dryRun: z
+        .boolean()
+        .default(true)
+        .describe(
+          'Whether to perform a dry run (show what would be removed without actually removing)'
+        ),
       batchSize: z.number().default(50).describe('Number of operations to process in each batch'),
     },
     async ({ noteIds, patterns, dryRun, batchSize }) => {
@@ -377,14 +400,14 @@ Failed: ${result.failed}${
         // First, get all notes info to analyze tags
         const notesInfo = await ankiClient.note.notesInfo({ notes: noteIds });
         const tagsToRemove = new Map<number, string[]>();
-        
+
         let totalTagsToRemove = 0;
-        
+
         // Analyze which tags match the patterns
         for (const noteInfo of notesInfo) {
           if (noteInfo && noteInfo.noteId && noteInfo.tags) {
             const matchingTags: string[] = [];
-            
+
             for (const tag of noteInfo.tags) {
               for (const pattern of patterns) {
                 try {
@@ -394,11 +417,13 @@ Failed: ${result.failed}${
                     break; // Tag matches one pattern, no need to check others
                   }
                 } catch (error) {
-                  throw new Error(`Invalid regex pattern "${pattern}": ${error instanceof Error ? error.message : String(error)}`);
+                  throw new Error(
+                    `Invalid regex pattern "${pattern}": ${error instanceof Error ? error.message : String(error)}`
+                  );
                 }
               }
             }
-            
+
             if (matchingTags.length > 0) {
               tagsToRemove.set(noteInfo.noteId, matchingTags);
               totalTagsToRemove += matchingTags.length;
@@ -454,7 +479,7 @@ Successful: ${result.successful}
 Failed: ${result.failed}
 Total tags removed: ${totalTagsToRemove - result.failed}${
                 result.errors.length > 0
-                  ? `\n\nErrors:\n${result.errors.map(e => `Note ${e.noteId}: ${e.error}`).join('\n')}`
+                  ? `\n\nErrors:\n${result.errors.map((e) => `Note ${e.noteId}: ${e.error}`).join('\n')}`
                   : ''
               }`,
             },
@@ -499,7 +524,7 @@ Total cards: ${result.totalOperations}
 Successful: ${result.successful}
 Failed: ${result.failed}${
                 result.errors.length > 0
-                  ? `\n\nErrors:\n${result.errors.map(e => `Card ${e.noteId}: ${e.error}`).join('\n')}`
+                  ? `\n\nErrors:\n${result.errors.map((e) => `Card ${e.noteId}: ${e.error}`).join('\n')}`
                   : ''
               }`,
             },
