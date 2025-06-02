@@ -154,19 +154,153 @@ export function registerMiscellaneousTools(server: McpServer) {
     }
   );
 
-  // Tool: Execute multiple actions
+  // Tool: Execute multiple AnkiConnect actions in a single request
+  // This is useful for performing batch operations efficiently
   server.tool(
     'multi',
     {
       actions: z
         .array(
           z.object({
-            action: z.string().describe('Name of the action to execute'),
-            params: z.any().optional().describe('Parameters for the action'),
-            version: z.number().optional().describe('API version for the action'),
+            action: z
+              .enum([
+                // Card Actions
+                'answerCards',
+                'areDue',
+                'areSuspended',
+                'cardsInfo',
+                'cardsModTime',
+                'cardsToNotes',
+                'findCards',
+                'forgetCards',
+                'getEaseFactors',
+                'getIntervals',
+                'relearnCards',
+                'setDueDate',
+                'setEaseFactors',
+                'setSpecificValueOfCard',
+                'suspend',
+                'suspended',
+                'unsuspend',
+                // Deck Actions
+                'changeDeck',
+                'cloneDeckConfigId',
+                'createDeck',
+                'deckNames',
+                'deckNamesAndIds',
+                'deleteDecks',
+                'getDeckConfig',
+                'getDecks',
+                'getDeckStats',
+                'removeDeckConfigId',
+                'saveDeckConfig',
+                'setDeckConfigId',
+                // Note Actions
+                'addNote',
+                'addNotes',
+                'addTags',
+                'canAddNotes',
+                'canAddNotesWithErrorDetail',
+                'clearUnusedTags',
+                'deleteNotes',
+                'findNotes',
+                'getNoteTags',
+                'getTags',
+                'notesInfo',
+                'notesModTime',
+                'removeEmptyNotes',
+                'removeTags',
+                'replaceTags',
+                'replaceTagsInAllNotes',
+                'updateNote',
+                'updateNoteFields',
+                'updateNoteModel',
+                'updateNoteTags',
+                // Model Actions
+                'createModel',
+                'findAndReplaceInModels',
+                'findModelsById',
+                'findModelsByName',
+                'modelFieldAdd',
+                'modelFieldDescriptions',
+                'modelFieldFonts',
+                'modelFieldNames',
+                'modelFieldRemove',
+                'modelFieldRename',
+                'modelFieldReposition',
+                'modelFieldSetDescription',
+                'modelFieldSetFont',
+                'modelFieldSetFontSize',
+                'modelFieldsOnTemplates',
+                'modelNames',
+                'modelNamesAndIds',
+                'modelStyling',
+                'modelTemplateAdd',
+                'modelTemplateRemove',
+                'modelTemplateRename',
+                'modelTemplateReposition',
+                'modelTemplates',
+                'updateModelStyling',
+                'updateModelTemplates',
+                // Media Actions
+                'deleteMediaFile',
+                'getMediaDirPath',
+                'getMediaFilesNames',
+                'retrieveMediaFile',
+                'storeMediaFile',
+                // Statistics Actions
+                'cardReviews',
+                'getCollectionStatsHTML',
+                'getLatestReviewID',
+                'getNumCardsReviewedByDay',
+                'getNumCardsReviewedToday',
+                'getReviewsOfCards',
+                'insertReviews',
+                // Graphical Actions
+                'guiAddCards',
+                'guiAnswerCard',
+                'guiBrowse',
+                'guiCheckDatabase',
+                'guiCurrentCard',
+                'guiDeckBrowser',
+                'guiDeckOverview',
+                'guiDeckReview',
+                'guiEditNote',
+                'guiExitAnki',
+                'guiImportFile',
+                'guiSelectCard',
+                'guiSelectedNotes',
+                'guiSelectNote',
+                'guiShowAnswer',
+                'guiShowQuestion',
+                'guiStartCardTimer',
+                'guiUndo',
+                // Miscellaneous Actions
+                'apiReflect',
+                'exportPackage',
+                'getActiveProfile',
+                'getProfiles',
+                'importPackage',
+                'loadProfile',
+                'multi',
+                'reloadCollection',
+                'requestPermission',
+                'sync',
+                'version',
+              ])
+              .describe('Name of the AnkiConnect action to execute'),
+            params: z
+              .record(z.any())
+              .optional()
+              .describe('Parameters object for the action (structure depends on the specific action)'),
+            version: z
+              .number()
+              .optional()
+              .default(6)
+              .describe('API version for the action (defaults to 6)'),
           })
         )
-        .describe('Array of actions to execute'),
+        .describe('Array of AnkiConnect actions to execute in sequence. Example: [{"action": "createDeck", "params": {"deck": "My Deck"}}, {"action": "addNote", "params": {"note": {...}}}]'),
     },
     async ({ actions }) => {
       try {
