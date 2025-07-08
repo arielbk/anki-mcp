@@ -27,13 +27,27 @@ export function registerModelTools(server: McpServer) {
     },
     async ({ modelName, inOrderFields, cardTemplates, css, isCloze }) => {
       try {
-        const result = await ankiClient.model.createModel({
+        const modelParams: {
+          modelName: string;
+          inOrderFields: string[];
+          cardTemplates: { [key: string]: string; Back: string; Front: string; }[];
+          css?: string;
+          isCloze?: boolean;
+        } = {
           modelName,
           inOrderFields,
           cardTemplates,
-          css,
-          isCloze,
-        });
+        };
+
+        if (css !== undefined) {
+          modelParams.css = css;
+        }
+
+        if (isCloze !== undefined) {
+          modelParams.isCloze = isCloze;
+        }
+
+        const result = await ankiClient.model.createModel(modelParams);
         return {
           content: [
             {
@@ -477,10 +491,26 @@ export function registerModelTools(server: McpServer) {
     },
     async ({ modelName, templates }) => {
       try {
+        // Filter out undefined values from templates
+        const cleanedTemplates: Record<string, { Back?: string; Front?: string }> = {};
+        
+        for (const [templateName, template] of Object.entries(templates)) {
+          if (template && typeof template === 'object') {
+            cleanedTemplates[templateName] = {};
+            const templateObj = template as { Front?: string; Back?: string };
+            if (templateObj.Front !== undefined) {
+              cleanedTemplates[templateName].Front = templateObj.Front;
+            }
+            if (templateObj.Back !== undefined) {
+              cleanedTemplates[templateName].Back = templateObj.Back;
+            }
+          }
+        }
+
         await ankiClient.model.updateModelTemplates({
           model: {
             name: modelName,
-            templates,
+            templates: cleanedTemplates,
           },
         });
         return {

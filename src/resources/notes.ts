@@ -2,6 +2,25 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { ankiClient } from '../utils/ankiClient.js';
 
 /**
+ * Helper function to parse note IDs from URI path
+ */
+function parseNoteIds(uri: URL): number[] {
+  const noteIdsParam = uri.pathname.split('/').slice(-2)[0];
+
+  if (!noteIdsParam) {
+    throw new Error('Note IDs parameter is missing from URI');
+  }
+
+  const noteIds = noteIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
+
+  if (noteIds.some((id: number) => isNaN(id))) {
+    throw new Error('Invalid note IDs provided');
+  }
+
+  return noteIds;
+}
+
+/**
  * Register all note-related resources with the MCP server
  */
 export function registerNoteResources(server: McpServer) {
@@ -40,12 +59,7 @@ export function registerNoteResources(server: McpServer) {
     new ResourceTemplate('anki:///notes/{noteIds}/info', { list: undefined }),
     async (uri) => {
       try {
-        const noteIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get noteIds from path
-        const noteIds = noteIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (noteIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid note IDs provided');
-        }
+        const noteIds = parseNoteIds(uri);
 
         const notesInfo = await ankiClient.note.notesInfo({ notes: noteIds });
 
@@ -223,12 +237,7 @@ export function registerNoteResources(server: McpServer) {
     new ResourceTemplate('anki:///notes/{noteIds}/mod-times', { list: undefined }),
     async (uri) => {
       try {
-        const noteIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get noteIds from path
-        const noteIds = noteIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (noteIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid note IDs provided');
-        }
+        const noteIds = parseNoteIds(uri);
 
         const modTimes = await ankiClient.note.notesModTime({ notes: noteIds });
 

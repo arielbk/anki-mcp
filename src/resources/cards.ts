@@ -2,6 +2,25 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { ankiClient } from '../utils/ankiClient.js';
 
 /**
+ * Helper function to parse card IDs from URI path
+ */
+function parseCardIds(uri: URL): number[] {
+  const cardIdsParam = uri.pathname.split('/').slice(-2)[0];
+
+  if (!cardIdsParam) {
+    throw new Error('Card IDs parameter is missing from URI');
+  }
+
+  const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
+
+  if (cardIds.some((id: number) => isNaN(id))) {
+    throw new Error('Invalid card IDs provided');
+  }
+
+  return cardIds;
+}
+
+/**
  * Register all card-related resources with the MCP server
  */
 export function registerCardResources(server: McpServer) {
@@ -40,12 +59,7 @@ export function registerCardResources(server: McpServer) {
     new ResourceTemplate('anki:///cards/{cardIds}/info', { list: undefined }),
     async (uri) => {
       try {
-        const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
-        const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (cardIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid card IDs provided');
-        }
+        const cardIds = parseCardIds(uri);
 
         const cardsInfo = await ankiClient.card.cardsInfo({ cards: cardIds });
         return {
@@ -71,12 +85,7 @@ export function registerCardResources(server: McpServer) {
     new ResourceTemplate('anki:///cards/{cardIds}/due', { list: undefined }),
     async (uri) => {
       try {
-        const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
-        const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (cardIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid card IDs provided');
-        }
+        const cardIds = parseCardIds(uri);
 
         const areDue = await ankiClient.card.areDue({ cards: cardIds });
         const result = cardIds.map((cardId: number, index: number) => ({
@@ -107,12 +116,7 @@ export function registerCardResources(server: McpServer) {
     new ResourceTemplate('anki:///cards/{cardIds}/suspended', { list: undefined }),
     async (uri) => {
       try {
-        const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
-        const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (cardIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid card IDs provided');
-        }
+        const cardIds = parseCardIds(uri);
 
         const areSuspended = await ankiClient.card.areSuspended({ cards: cardIds });
         const result = cardIds.map((cardId: number, index: number) => ({
@@ -143,12 +147,7 @@ export function registerCardResources(server: McpServer) {
     new ResourceTemplate('anki:///cards/{cardIds}/mod-time', { list: undefined }),
     async (uri) => {
       try {
-        const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
-        const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (cardIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid card IDs provided');
-        }
+        const cardIds = parseCardIds(uri);
 
         const modTimes = await ankiClient.card.cardsModTime({ cards: cardIds });
         return {
@@ -174,12 +173,7 @@ export function registerCardResources(server: McpServer) {
     new ResourceTemplate('anki:///cards/{cardIds}/notes', { list: undefined }),
     async (uri) => {
       try {
-        const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
-        const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (cardIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid card IDs provided');
-        }
+        const cardIds = parseCardIds(uri);
 
         const noteIds = await ankiClient.card.cardsToNotes({ cards: cardIds });
         return {
@@ -205,12 +199,7 @@ export function registerCardResources(server: McpServer) {
     new ResourceTemplate('anki:///cards/{cardIds}/ease-factors', { list: undefined }),
     async (uri) => {
       try {
-        const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
-        const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (cardIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid card IDs provided');
-        }
+        const cardIds = parseCardIds(uri);
 
         const easeFactors = await ankiClient.card.getEaseFactors({ cards: cardIds });
         const result = cardIds.map((cardId: number, index: number) => ({
@@ -241,12 +230,7 @@ export function registerCardResources(server: McpServer) {
     new ResourceTemplate('anki:///cards/{cardIds}/intervals', { list: undefined }),
     async (uri) => {
       try {
-        const cardIdsParam = uri.pathname.split('/').slice(-2)[0]; // Get cardIds from path
-        const cardIds = cardIdsParam.split(',').map((id: string) => parseInt(id.trim(), 10));
-
-        if (cardIds.some((id: number) => isNaN(id))) {
-          throw new Error('Invalid card IDs provided');
-        }
+        const cardIds = parseCardIds(uri);
 
         // Check for complete parameter in query string
         const url = new URL(uri.href);

@@ -292,7 +292,9 @@ export function registerMiscellaneousTools(server: McpServer) {
             params: z
               .record(z.any())
               .optional()
-              .describe('Parameters object for the action (structure depends on the specific action)'),
+              .describe(
+                'Parameters object for the action (structure depends on the specific action)'
+              ),
             version: z
               .number()
               .optional()
@@ -300,7 +302,9 @@ export function registerMiscellaneousTools(server: McpServer) {
               .describe('API version for the action (defaults to 6)'),
           })
         )
-        .describe('Array of AnkiConnect actions to execute in sequence. Example: [{"action": "createDeck", "params": {"deck": "My Deck"}}, {"action": "addNote", "params": {"note": {...}}}]'),
+        .describe(
+          'Array of AnkiConnect actions to execute in sequence. Example: [{"action": "createDeck", "params": {"deck": "My Deck"}}, {"action": "addNote", "params": {"note": {...}}}]'
+        ),
     },
     async ({ actions }) => {
       try {
