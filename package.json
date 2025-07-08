@@ -1,50 +1,79 @@
 {
   "name": "@arielbk/anki-mcp",
-  "version": "0.2.6",
-  "description": "MCP server for integrating with Anki flashcards",
+  "version": "0.3.0",
+  "description": "MCP server for integrating with Anki flashcards through conversational AI",
   "type": "module",
   "main": "dist/index.js",
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/arielbk/anki-mcp"
+  },
+  "homepage": "https://github.com/arielbk/anki-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/arielbk/anki-mcp/issues"
   },
   "bin": {
     "anki-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "eslint .",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --cache --fix",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "start": "node dist/index.js",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
-    "prepublishOnly": "pnpm build"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublishOnly": "pnpm clean && pnpm typecheck && pnpm lint && pnpm build"
   },
   "keywords": [
     "anki",
     "mcp",
+    "model-context-protocol",
     "flashcards",
-    "ankiconnect"
+    "ankiconnect",
+    "spaced-repetition",
+    "learning",
+    "ai",
+    "chatbot",
+    "study"
   ],
   "author": "arielbk",
   "license": "MIT",
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@modelcontextprotocol/sdk": "^1.15.0",
     "yanki-connect": "^2.2.3",
-    "zod": "^3.25.28"
+    "zod": "^3.25.75"
   },
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.13.0",
-    "@typescript-eslint/eslint-plugin": "^8.32.1",
-    "@typescript-eslint/parser": "^8.32.1",
-    "eslint": "^9.27.0",
+    "@types/node": "^24.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.35.1",
+    "@typescript-eslint/parser": "^8.35.1",
+    "eslint": "^9.30.1",
     "eslint-config-prettier": "^10.1.5",
-    "eslint-plugin-prettier": "^5.4.0",
-    "prettier": "^3.5.3",
+    "eslint-plugin-prettier": "^5.5.1",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3"
   }
