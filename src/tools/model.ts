@@ -30,7 +30,7 @@ export function registerModelTools(server: McpServer) {
         const modelParams: {
           modelName: string;
           inOrderFields: string[];
-          cardTemplates: { [key: string]: string; Back: string; Front: string; }[];
+          cardTemplates: { [key: string]: string; Back: string; Front: string }[];
           css?: string;
           isCloze?: boolean;
         } = {
@@ -493,7 +493,7 @@ export function registerModelTools(server: McpServer) {
       try {
         // Filter out undefined values from templates
         const cleanedTemplates: Record<string, { Back?: string; Front?: string }> = {};
-        
+
         for (const [templateName, template] of Object.entries(templates)) {
           if (template && typeof template === 'object') {
             cleanedTemplates[templateName] = {};

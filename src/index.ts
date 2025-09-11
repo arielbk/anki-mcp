@@ -66,7 +66,7 @@ async function main() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    
+
     // Log successful startup to stderr (so it doesn't interfere with MCP protocol)
     console.error('Anki MCP Server started successfully');
   } catch (error) {
