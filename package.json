@@ -41,7 +41,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "start": "node dist/index.js",
+    "start:http": "node dist/index.js --http",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "inspect:http": "npx @modelcontextprotocol/inspector --transport http --server-url http://127.0.0.1:3000/mcp",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepublishOnly": "pnpm clean && pnpm typecheck && pnpm lint && pnpm build"
   },
@@ -61,12 +63,14 @@
   "license": "MIT",
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.0",
+    "@modelcontextprotocol/sdk": "^1.18.1",
+    "express": "^4.21.1",
     "yanki-connect": "^2.2.3",
     "zod": "^3.25.75"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.13.0",
+    "@modelcontextprotocol/inspector": "^0.16.8",
+    "@types/express": "^5.0.3",
     "@types/node": "^24.0.10",
     "@typescript-eslint/eslint-plugin": "^8.35.1",
     "@typescript-eslint/parser": "^8.35.1",

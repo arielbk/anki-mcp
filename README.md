@@ -161,6 +161,15 @@ For stdio transport, run:
 node dist/index.js
 ```
 
+For localhost HTTP (Streamable HTTP) transport, run:
+
+```bash
+node dist/index.js --http --host=127.0.0.1 --port=3000
+# The MCP endpoint will be at http://127.0.0.1:3000/mcp
+```
+
+Clients that support Streamable HTTP can connect directly. Legacy SSE clients may still work via client-side fallback.
+
 ## 🎮 Usage Examples
 
 Once configured with Claude Desktop, you can have natural conversations like:
