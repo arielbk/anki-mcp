@@ -33,7 +33,10 @@ export function registerConsolidatedTools(server: McpServer) {
       // For create operations
       deckName: z.string().optional().describe('Deck name (for create operations)'),
       modelName: z.string().optional().describe('Note type/model name (for create operations)'),
-      fields: z.record(z.string()).optional().describe('Field name-value pairs (for create/update)'),
+      fields: z
+        .record(z.string())
+        .optional()
+        .describe('Field name-value pairs (for create/update)'),
       tags: z.array(z.string()).optional().describe('Tags to add/remove or set'),
 
       // For batch create
@@ -279,7 +282,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
       days: z.string().optional().describe('Days from today for due date (for reschedule)'),
     },
-    async ({ operation, query, cardIds, answers, days }) => {
+    async ({ operation, query, cardIds, answers }) => {
       try {
         switch (operation) {
           case 'find_due': {
@@ -586,7 +589,10 @@ export function registerConsolidatedTools(server: McpServer) {
       deckName: z.string().optional().describe('Deck name for deck-specific stats'),
       cardIds: z.array(z.number()).optional().describe('Card IDs for detailed analysis'),
       startTimestamp: z.number().optional().describe('Start timestamp for review history'),
-      wholeCollection: z.boolean().optional().describe('Get whole collection stats vs current deck'),
+      wholeCollection: z
+        .boolean()
+        .optional()
+        .describe('Get whole collection stats vs current deck'),
     },
     async ({ scope, deckName, cardIds, startTimestamp, wholeCollection }) => {
       try {
