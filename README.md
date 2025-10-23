@@ -39,13 +39,14 @@ Imagine having an AI tutor that knows your entire flashcard collection and can:
 
 ## 🎯 Features
 
-- **Full Anki Integration**: Complete access to decks, cards, notes, and statistics via all 115 AnkiConnect API methods
-- **Conversational Interface**: Natural language commands through your AI assistant
-- **Bulk Operations**: Efficiently manage thousands of cards at once
-- **Real-time Statistics**: Get insights into your learning progress
-- **Media Support**: Handle images, audio, and other media in your cards
-- **Advanced Querying**: Find cards using complex search criteria
-- **Type Safety**: Fully typed API with comprehensive error handling
+- **🎯 Smart Tool Design**: Intuitive, high-level tools designed specifically for AI agents
+- **💬 Natural Conversations**: Talk to Claude about your flashcards like you would a study buddy
+- **⚡ Lightning Fast**: Efficient operations that don't bog down your AI assistant
+- **📦 Bulk Operations**: Update thousands of cards at once with simple commands
+- **📊 Study Insights**: Deep analytics on your learning progress and patterns
+- **🎨 Rich Media**: Full support for images, audio, and other media in your cards
+- **🔍 Powerful Search**: Leverage Anki's advanced search syntax through natural language
+- **🔒 Rock Solid**: Fully typed TypeScript with comprehensive error handling
 
 ## 🛠 Technical Stack
 
@@ -206,54 +207,29 @@ You: "Tag all cards about cardiovascular system with 'cardiology' and move them 
 Claude: I'll help you organize those cards...
 ```
 
-## 🔧 Available Tools & Resources
+## 🔧 Available Tools
 
-This MCP server provides comprehensive access to your Anki collection through these capabilities:
+The server provides **6 intuitive tools** that cover everything you need:
 
-### 📚 **Deck Management**
+### 📝 **Manage Flashcards**
+Create, update, delete, and search your flashcards. Perfect for content creation, bulk updates, and organization.
 
-- List all decks with statistics
-- Create new decks
-- Rename and delete decks
-- Get deck configuration
+### 🎯 **Study Sessions**
+Run interactive quiz sessions, manage card scheduling, and track which cards need review.
 
-### 🗂️ **Card Operations**
+### 📚 **Manage Decks**
+Create and organize decks, move cards around, and configure deck settings.
 
-- Find cards by search criteria
-- Answer cards (simulate reviews)
-- Get card information and statistics
-- Suspend/unsuspend cards
-- Bulk card operations
+### 📊 **Get Analytics**
+Dive into your study statistics, review history, and learning patterns.
 
-### 📝 **Note Management**
+### 🎨 **Manage Models**
+Customize note types, add fields, modify templates, and style your cards.
 
-- Add new notes with custom fields
-- Update existing notes
-- Delete notes
-- Find notes by search query
-- Bulk note operations
+### 🔧 **Anki Operations**
+Handle sync, media files, imports/exports, and other utility operations.
 
-### 📊 **Statistics & Analytics**
-
-- Deck statistics and performance metrics
-- Card ease and interval data
-- Review history and patterns
-- Learning progress insights
-
-### 🎨 **Media & Models**
-
-- Access note types and field definitions
-- Media file management
-- Template customization support
-
-### 🔍 **Advanced Features**
-
-- Complex search queries using Anki's search syntax
-- Batch operations for efficiency
-- Real-time synchronization with Anki
-- Error handling and validation
-- Organized API methods grouped by functionality (cards, decks, notes, models, statistics, media, etc.)
-- Direct access to all 115 AnkiConnect API methods with full type safety
+> Each tool supports multiple operations, giving you full control over your Anki collection through simple, natural language commands.
 
 ## 🛠 Development
 
