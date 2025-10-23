@@ -230,9 +230,9 @@ Customize note types, add fields, modify templates, and style your cards.
 Handle sync, media files, imports/exports, and other utility operations.
 
 ### 🖼️ **Get Media File**
-Retrieve media files (images, audio, etc.) from your Anki collection. Returns files as base64-encoded data that AI assistants can view and analyze directly.
+Retrieve media files (images, audio, etc.) from your Anki collection. AI assistants can analyze images directly (though they won't display in the UI).
 
-> Each tool supports multiple operations, giving you full control over your Anki collection through simple, natural language commands.
+> **💡 Pro Tip:** Many operations support pagination to prevent overwhelming your context window. Use `limit` and `offset` parameters when working with large result sets.
 
 ## 🛠 Development
 

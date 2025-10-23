@@ -17,7 +17,7 @@ import { registerConsolidatedTools } from './tools/index.js';
 function createServer(): McpServer {
   const server = new McpServer({
     name: 'Anki MCP Server',
-    version: '0.4.1',
+    version: '0.4.2',
   });
 
   // Register resources (for context)

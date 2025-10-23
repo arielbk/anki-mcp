@@ -79,7 +79,11 @@ export function registerConsolidatedTools(server: McpServer) {
       // For find operations
       query: z.string().optional().describe('Anki search query (for find operation)'),
       includeDetails: z.boolean().optional().describe('Include detailed note info (for find)'),
-      limit: z.number().optional().describe('Max results with details (for find)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results to return (default: 50, recommended to prevent context overflow)'),
+      offset: z.number().optional().describe('Number of results to skip for pagination (default: 0)'),
 
       // For get_info
       cardIds: z.array(z.number()).optional().describe('Card IDs to get info for'),
@@ -96,6 +100,7 @@ export function registerConsolidatedTools(server: McpServer) {
       query,
       includeDetails,
       limit = 50,
+      offset = 0,
       cardIds,
     }) => {
       try {
@@ -186,14 +191,24 @@ export function registerConsolidatedTools(server: McpServer) {
               throw new Error('find requires query parameter');
             }
             const foundNoteIds = await ankiClient.note.findNotes({ query });
-            let result = `Found ${foundNoteIds.length} flashcard(s) matching "${query}"`;
+            const totalResults = foundNoteIds.length;
 
-            if (includeDetails && foundNoteIds.length > 0) {
-              const limitedIds = foundNoteIds.slice(0, limit);
-              const notesInfo = await ankiClient.note.notesInfo({ notes: limitedIds });
-              result += `\n\nShowing details for first ${limitedIds.length}:\n${JSON.stringify(notesInfo, null, 2)}`;
-            } else {
-              result += `\nIDs: [${foundNoteIds.join(', ')}]`;
+            // Apply pagination
+            const paginatedIds = foundNoteIds.slice(offset, offset + limit);
+            const hasMore = offset + limit < totalResults;
+
+            let result = `Found ${totalResults} total flashcard(s) matching "${query}"`;
+            result += `\nShowing results ${offset + 1}-${offset + paginatedIds.length} of ${totalResults}`;
+
+            if (hasMore) {
+              result += `\n⚠️  More results available. Use offset=${offset + limit} to see next page.`;
+            }
+
+            if (includeDetails && paginatedIds.length > 0) {
+              const notesInfo = await ankiClient.note.notesInfo({ notes: paginatedIds });
+              result += `\n\nDetails:\n${JSON.stringify(notesInfo, null, 2)}`;
+            } else if (paginatedIds.length > 0) {
+              result += `\n\nIDs: [${paginatedIds.join(', ')}]`;
             }
 
             return {
@@ -210,12 +225,25 @@ export function registerConsolidatedTools(server: McpServer) {
             if (!cardIds || cardIds.length === 0) {
               throw new Error('get_info requires cardIds array');
             }
+
+            // Warn if requesting too many cards at once
+            if (cardIds.length > 50) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `⚠️  Requesting ${cardIds.length} cards may use excessive context.\nRecommendation: Request fewer cards (≤50) or use 'find' with pagination instead.`,
+                  },
+                ],
+              };
+            }
+
             const cardsInfo = await ankiClient.card.cardsInfo({ cards: cardIds });
             return {
               content: [
                 {
                   type: 'text',
-                  text: `Card information:\n${JSON.stringify(cardsInfo, null, 2)}`,
+                  text: `Card information (${cardsInfo.length} cards):\n${JSON.stringify(cardsInfo, null, 2)}`,
                 },
               ],
             };
@@ -1187,7 +1215,8 @@ export function registerConsolidatedTools(server: McpServer) {
           size,
         };
 
-        // For images, return as image content that Claude can see
+        // For images, return as image content that Claude can analyze
+        // Note: Claude can see the image but it won't display to the user
         if (mimeType.startsWith('image/')) {
           return {
             content: [
@@ -1198,7 +1227,11 @@ export function registerConsolidatedTools(server: McpServer) {
               },
               {
                 type: 'text',
-                text: `📷 Retrieved image: ${filename} (${mimeType}, ${size} bytes)`,
+                text: `📷 Image: ${filename}
+Format: ${mimeType}
+Size: ${(size / 1024).toFixed(1)} KB
+
+Note: I can see and analyze this image, but it won't display in the UI. I can describe what I see or answer questions about it.`,
               },
             ],
           };
