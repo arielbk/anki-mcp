@@ -12,47 +12,23 @@ import {
   registerNoteResources,
   registerStatisticResources,
 } from './resources/index.js';
-import {
-  registerCardTools,
-  registerDeckTools,
-  registerGraphicalTools,
-  registerMediaTools,
-  registerMiscellaneousTools,
-  registerModelTools,
-  registerNoteTools,
-  registerStatisticTools,
-} from './tools/index.js';
+import { registerConsolidatedTools } from './tools/index.js';
 
 function createServer(): McpServer {
   const server = new McpServer({
     name: 'Anki MCP Server',
-    version: '0.3.0',
+    version: '0.4.0-rc.1',
   });
 
-  // Register all deck resources and tools
+  // Register resources (for context)
   registerDeckResources(server);
-  registerDeckTools(server);
-
-  // Register all card resources and tools
   registerCardResources(server);
-  registerCardTools(server);
-
-  // Register all note resources and tools
   registerNoteResources(server);
-  registerNoteTools(server);
-
-  // Register all model resources and tools
   registerModelResources(server);
-  registerModelTools(server);
-
-  // Register all statistic resources and tools
   registerStatisticResources(server);
-  registerStatisticTools(server);
 
-  // Register all other tools (no resources needed for these)
-  registerGraphicalTools(server);
-  registerMediaTools(server);
-  registerMiscellaneousTools(server);
+  // Register consolidated tools (6 high-level tools following MCP best practices)
+  registerConsolidatedTools(server);
 
   return server;
 }

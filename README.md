@@ -39,13 +39,15 @@ Imagine having an AI tutor that knows your entire flashcard collection and can:
 
 ## 🎯 Features
 
-- **Full Anki Integration**: Complete access to decks, cards, notes, and statistics via all 115 AnkiConnect API methods
-- **Conversational Interface**: Natural language commands through your AI assistant
-- **Bulk Operations**: Efficiently manage thousands of cards at once
-- **Real-time Statistics**: Get insights into your learning progress
-- **Media Support**: Handle images, audio, and other media in your cards
-- **Advanced Querying**: Find cards using complex search criteria
-- **Type Safety**: Fully typed API with comprehensive error handling
+- **🎯 Domain-Aware Tools**: 6 high-level tools designed for AI agents (vs. 100+ low-level endpoints)
+- **💬 Conversational Interface**: Natural language commands through your AI assistant
+- **⚡ Context-Efficient**: Minimal prompt clutter while maintaining full functionality
+- **📦 Bulk Operations**: Efficiently manage thousands of cards at once
+- **📊 Real-time Statistics**: Get insights into your learning progress
+- **🎨 Media Support**: Handle images, audio, and other media in your cards
+- **🔍 Advanced Querying**: Find cards using Anki's powerful search syntax
+- **🔒 Type Safety**: Fully typed API with comprehensive error handling
+- **✨ MCP Best Practices**: Follows 2025 Model Context Protocol design guidelines
 
 ## 🛠 Technical Stack
 
@@ -206,54 +208,47 @@ You: "Tag all cards about cardiovascular system with 'cardiology' and move them 
 Claude: I'll help you organize those cards...
 ```
 
-## 🔧 Available Tools & Resources
+## 🔧 Available Tools
 
-This MCP server provides comprehensive access to your Anki collection through these capabilities:
+This MCP server provides **6 powerful, domain-aware tools** designed following MCP best practices for optimal AI agent interaction:
 
-### 📚 **Deck Management**
+### 1. 📝 **`manage_flashcards`**
+Create, update, delete, and search flashcards (notes and cards)
+- **Operations**: `create`, `create_batch`, `update`, `delete`, `find`, `get_info`, `add_tags`, `remove_tags`, `clear_empty`
+- **Use cases**: Content creation, bulk updates, tag management, searching
 
-- List all decks with statistics
-- Create new decks
-- Rename and delete decks
-- Get deck configuration
+### 2. 🎯 **`study_session`**
+Interactive quiz and review operations
+- **Operations**: `find_due`, `answer`, `suspend`, `unsuspend`, `check_status`, `forget`, `relearn`
+- **Use cases**: Quiz sessions, card scheduling, review management
 
-### 🗂️ **Card Operations**
+### 3. 📚 **`manage_decks`**
+Deck creation, configuration, and organization
+- **Operations**: `create`, `delete`, `list`, `get_stats`, `move_cards`, `get_config`, `set_config`
+- **Use cases**: Deck management, card organization, configuration
 
-- Find cards by search criteria
-- Answer cards (simulate reviews)
-- Get card information and statistics
-- Suspend/unsuspend cards
-- Bulk card operations
+### 4. 📊 **`get_analytics`**
+Statistics and learning insights
+- **Operations**: `deck_stats`, `collection_stats`, `reviews_by_day`, `reviews_today`, `card_reviews`, `card_details`
+- **Use cases**: Progress tracking, performance analysis, study insights
 
-### 📝 **Note Management**
+### 5. 🎨 **`manage_models`**
+Note type (model) configuration
+- **Operations**: `list`, `create`, `add_field`, `remove_field`, `rename_field`, `add_template`, `remove_template`, `update_styling`
+- **Use cases**: Template customization, note type design
 
-- Add new notes with custom fields
-- Update existing notes
-- Delete notes
-- Find notes by search query
-- Bulk note operations
+### 6. 🔧 **`anki_operations`**
+Utility operations (sync, media, export/import)
+- **Operations**: `sync`, `version`, `export_deck`, `import_package`, `store_media`, `retrieve_media`, `delete_media`, `list_media`, `get_profiles`
+- **Use cases**: Syncing, media management, backups
 
-### 📊 **Statistics & Analytics**
+### 🌟 **Why 6 Tools Instead of 100+?**
 
-- Deck statistics and performance metrics
-- Card ease and interval data
-- Review history and patterns
-- Learning progress insights
-
-### 🎨 **Media & Models**
-
-- Access note types and field definitions
-- Media file management
-- Template customization support
-
-### 🔍 **Advanced Features**
-
-- Complex search queries using Anki's search syntax
-- Batch operations for efficiency
-- Real-time synchronization with Anki
-- Error handling and validation
-- Organized API methods grouped by functionality (cards, decks, notes, models, statistics, media, etc.)
-- Direct access to all 115 AnkiConnect API methods with full type safety
+Following MCP best practices, we've consolidated 102+ low-level API endpoints into 6 high-level, domain-aware tools that are:
+- **Easier for AI agents to understand and use**
+- **More context-efficient** (less clutter in prompts)
+- **Better organized by use case** rather than API structure
+- **Fully backward compatible** via the underlying yanki-connect library
 
 ## 🛠 Development
 
