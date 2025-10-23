@@ -209,7 +209,7 @@ Claude: I'll help you organize those cards...
 
 ## 🔧 Available Tools
 
-The server provides **6 intuitive tools** that cover everything you need:
+The server provides **7 intuitive tools** that cover everything you need:
 
 ### 📝 **Manage Flashcards**
 Create, update, delete, and search your flashcards. Perfect for content creation, bulk updates, and organization.
@@ -228,6 +228,9 @@ Customize note types, add fields, modify templates, and style your cards.
 
 ### 🔧 **Anki Operations**
 Handle sync, media files, imports/exports, and other utility operations.
+
+### 🖼️ **Get Media File**
+Retrieve media files (images, audio, etc.) from your Anki collection. Returns files as base64-encoded data that AI assistants can view and analyze directly.
 
 > Each tool supports multiple operations, giving you full control over your Anki collection through simple, natural language commands.
 

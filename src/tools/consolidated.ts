@@ -3,6 +3,26 @@ import { z } from 'zod';
 import { ankiClient } from '../utils/ankiClient.js';
 
 /**
+ * MIME type mapping for common media file extensions
+ */
+const MIME_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  ico: 'image/x-icon',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  pdf: 'application/pdf',
+};
+
+/**
  * Register consolidated, high-level tools with the MCP server
  * Following MCP best practices: domain-aware, intentional tool design
  * instead of exposing every low-level API endpoint
@@ -1109,6 +1129,97 @@ export function registerConsolidatedTools(server: McpServer) {
         throw new Error(
           `anki_operations failed: ${error instanceof Error ? error.message : String(error)}`
         );
+      }
+    }
+  );
+
+  /**
+   * TOOL 7: get_media_file
+   * Retrieve media files from Anki collection as base64-encoded data
+   * This enables AI assistants to view and work with images/audio referenced in cards
+   */
+  server.tool(
+    'get_media_file',
+    {
+      filename: z.string().describe('Media filename referenced in Anki cards (e.g., "image.png")'),
+    },
+    async ({ filename }) => {
+      try {
+        // Validate filename (basic security check)
+        if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+          throw new Error('Invalid filename: must be a simple filename without path traversal');
+        }
+
+        // Retrieve the media file from AnkiConnect
+        const base64Content = await ankiClient.media.retrieveMediaFile({ filename });
+
+        if (base64Content === false) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: `File not found: ${filename}`,
+                  filename,
+                }),
+              },
+            ],
+          };
+        }
+
+        // Detect MIME type from file extension
+        const extension = filename.split('.').pop()?.toLowerCase() || '';
+        const mimeType = MIME_TYPES[extension] || 'application/octet-stream';
+
+        // Calculate size (approximate from base64 length)
+        const size = Math.floor((base64Content.length * 3) / 4);
+
+        // Return the file data with metadata
+        const response = {
+          filename,
+          mimeType,
+          base64Data: base64Content,
+          size,
+        };
+
+        // For images, return as image content that Claude can see
+        if (mimeType.startsWith('image/')) {
+          return {
+            content: [
+              {
+                type: 'image',
+                data: base64Content,
+                mimeType,
+              },
+              {
+                type: 'text',
+                text: `📷 Retrieved image: ${filename} (${mimeType}, ${size} bytes)`,
+              },
+            ],
+          };
+        }
+
+        // For non-images, return as text with metadata
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                error: `Failed to retrieve media file: ${error instanceof Error ? error.message : String(error)}`,
+                filename,
+              }),
+            },
+          ],
+        };
       }
     }
   );
