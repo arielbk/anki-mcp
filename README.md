@@ -39,15 +39,14 @@ Imagine having an AI tutor that knows your entire flashcard collection and can:
 
 ## 🎯 Features
 
-- **🎯 Domain-Aware Tools**: 6 high-level tools designed for AI agents (vs. 100+ low-level endpoints)
-- **💬 Conversational Interface**: Natural language commands through your AI assistant
-- **⚡ Context-Efficient**: Minimal prompt clutter while maintaining full functionality
-- **📦 Bulk Operations**: Efficiently manage thousands of cards at once
-- **📊 Real-time Statistics**: Get insights into your learning progress
-- **🎨 Media Support**: Handle images, audio, and other media in your cards
-- **🔍 Advanced Querying**: Find cards using Anki's powerful search syntax
-- **🔒 Type Safety**: Fully typed API with comprehensive error handling
-- **✨ MCP Best Practices**: Follows 2025 Model Context Protocol design guidelines
+- **🎯 Smart Tool Design**: Intuitive, high-level tools designed specifically for AI agents
+- **💬 Natural Conversations**: Talk to Claude about your flashcards like you would a study buddy
+- **⚡ Lightning Fast**: Efficient operations that don't bog down your AI assistant
+- **📦 Bulk Operations**: Update thousands of cards at once with simple commands
+- **📊 Study Insights**: Deep analytics on your learning progress and patterns
+- **🎨 Rich Media**: Full support for images, audio, and other media in your cards
+- **🔍 Powerful Search**: Leverage Anki's advanced search syntax through natural language
+- **🔒 Rock Solid**: Fully typed TypeScript with comprehensive error handling
 
 ## 🛠 Technical Stack
 
@@ -210,45 +209,27 @@ Claude: I'll help you organize those cards...
 
 ## 🔧 Available Tools
 
-This MCP server provides **6 powerful, domain-aware tools** designed following MCP best practices for optimal AI agent interaction:
+The server provides **6 intuitive tools** that cover everything you need:
 
-### 1. 📝 **`manage_flashcards`**
-Create, update, delete, and search flashcards (notes and cards)
-- **Operations**: `create`, `create_batch`, `update`, `delete`, `find`, `get_info`, `add_tags`, `remove_tags`, `clear_empty`
-- **Use cases**: Content creation, bulk updates, tag management, searching
+### 📝 **Manage Flashcards**
+Create, update, delete, and search your flashcards. Perfect for content creation, bulk updates, and organization.
 
-### 2. 🎯 **`study_session`**
-Interactive quiz and review operations
-- **Operations**: `find_due`, `answer`, `suspend`, `unsuspend`, `check_status`, `forget`, `relearn`
-- **Use cases**: Quiz sessions, card scheduling, review management
+### 🎯 **Study Sessions**
+Run interactive quiz sessions, manage card scheduling, and track which cards need review.
 
-### 3. 📚 **`manage_decks`**
-Deck creation, configuration, and organization
-- **Operations**: `create`, `delete`, `list`, `get_stats`, `move_cards`, `get_config`, `set_config`
-- **Use cases**: Deck management, card organization, configuration
+### 📚 **Manage Decks**
+Create and organize decks, move cards around, and configure deck settings.
 
-### 4. 📊 **`get_analytics`**
-Statistics and learning insights
-- **Operations**: `deck_stats`, `collection_stats`, `reviews_by_day`, `reviews_today`, `card_reviews`, `card_details`
-- **Use cases**: Progress tracking, performance analysis, study insights
+### 📊 **Get Analytics**
+Dive into your study statistics, review history, and learning patterns.
 
-### 5. 🎨 **`manage_models`**
-Note type (model) configuration
-- **Operations**: `list`, `create`, `add_field`, `remove_field`, `rename_field`, `add_template`, `remove_template`, `update_styling`
-- **Use cases**: Template customization, note type design
+### 🎨 **Manage Models**
+Customize note types, add fields, modify templates, and style your cards.
 
-### 6. 🔧 **`anki_operations`**
-Utility operations (sync, media, export/import)
-- **Operations**: `sync`, `version`, `export_deck`, `import_package`, `store_media`, `retrieve_media`, `delete_media`, `list_media`, `get_profiles`
-- **Use cases**: Syncing, media management, backups
+### 🔧 **Anki Operations**
+Handle sync, media files, imports/exports, and other utility operations.
 
-### 🌟 **Why 6 Tools Instead of 100+?**
-
-Following MCP best practices, we've consolidated 102+ low-level API endpoints into 6 high-level, domain-aware tools that are:
-- **Easier for AI agents to understand and use**
-- **More context-efficient** (less clutter in prompts)
-- **Better organized by use case** rather than API structure
-- **Fully backward compatible** via the underlying yanki-connect library
+> Each tool supports multiple operations, giving you full control over your Anki collection through simple, natural language commands.
 
 ## 🛠 Development
 
