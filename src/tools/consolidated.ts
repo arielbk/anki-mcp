@@ -1146,7 +1146,12 @@ export function registerConsolidatedTools(server: McpServer) {
     async ({ filename }) => {
       try {
         // Validate filename (basic security check)
-        if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        if (
+          !filename ||
+          filename.includes('..') ||
+          filename.includes('/') ||
+          filename.includes('\\')
+        ) {
           throw new Error('Invalid filename: must be a simple filename without path traversal');
         }
 
