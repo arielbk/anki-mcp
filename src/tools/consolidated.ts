@@ -83,7 +83,10 @@ export function registerConsolidatedTools(server: McpServer) {
         .number()
         .optional()
         .describe('Max results to return (default: 50, recommended to prevent context overflow)'),
-      offset: z.number().optional().describe('Number of results to skip for pagination (default: 0)'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Number of results to skip for pagination (default: 0)'),
 
       // For get_info
       cardIds: z.array(z.number()).optional().describe('Card IDs to get info for'),
