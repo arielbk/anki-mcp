@@ -35,6 +35,7 @@ export function registerConsolidatedTools(server: McpServer) {
    */
   server.tool(
     'manage_flashcards',
+    'Create, update, delete, search, inspect, and tag Anki flashcards through one high-level note/card workflow. Use this for note lifecycle work and card lookup, not for deck structure, note-type schema changes, or study scheduling. Mutating operations change the local Anki collection immediately; searches are read-only. Choose `operation` first, then provide the operation-specific IDs, query, fields, tags, or pagination inputs described by the schema.',
     {
       operation: z
         .enum([
@@ -312,6 +313,7 @@ export function registerConsolidatedTools(server: McpServer) {
    */
   server.tool(
     'study_session',
+    'Find due cards and apply review-state actions such as answering, suspending, unsuspending, resetting, and relearning cards. Use this for scheduling and review flow, not for editing note content or reorganizing decks. Several operations mutate card state in Anki immediately; `find_due` and `check_status` are read-only. Select `operation`, then pass either `query`, `cardIds`, or `answers` as required for that action.',
     {
       operation: z
         .enum(['find_due', 'answer', 'suspend', 'unsuspend', 'check_status', 'forget', 'relearn'])
@@ -483,6 +485,7 @@ export function registerConsolidatedTools(server: McpServer) {
    */
   server.tool(
     'manage_decks',
+    'Create, delete, list, inspect, move cards between, and configure Anki decks. Use this for deck-level organization, not for editing flashcard fields, note types, or study answers. Create, delete, move, and config operations mutate the collection; list and stats/config reads do not. Set `operation` first and supply the matching deck names, card IDs, target deck, or config ID.',
     {
       operation: z
         .enum(['create', 'delete', 'list', 'get_stats', 'move_cards', 'get_config', 'set_config'])
@@ -625,6 +628,7 @@ export function registerConsolidatedTools(server: McpServer) {
    */
   server.tool(
     'get_analytics',
+    'Read study analytics and review history for decks, the collection, or specific cards. Use this when the agent needs reporting or diagnostics, not when it needs to mutate Anki data. This tool is read-only but some scopes can return large payloads, so prefer the narrowest scope and explicit card IDs or timestamps when available. Choose `scope`, then provide the deck, cards, or review start timestamp required by that scope.',
     {
       scope: z
         .enum([
@@ -761,6 +765,7 @@ export function registerConsolidatedTools(server: McpServer) {
    */
   server.tool(
     'manage_models',
+    'List, create, and modify Anki note types, including fields, templates, and CSS styling. Use this for schema/template work, not for individual note content, decks, or review scheduling. All operations except `list` mutate the collection and can affect future rendering or compatibility of notes using that model. Pick `operation` first, then provide the model name plus the exact field, template, CSS, or creation inputs needed.',
     {
       operation: z
         .enum([
@@ -970,6 +975,7 @@ export function registerConsolidatedTools(server: McpServer) {
    */
   server.tool(
     'anki_operations',
+    'Run general Anki utility operations: sync, version lookup, package import/export, profile listing, and media storage or retrieval. Use this for cross-cutting maintenance tasks that do not belong to flashcard, deck, model, or study workflows. Import, export, sync, and media writes have external side effects; version and profile reads do not. Select `operation`, then provide the relevant deck name, file path, filename, media payload, URL, or pattern.',
     {
       operation: z
         .enum([
@@ -1171,6 +1177,7 @@ export function registerConsolidatedTools(server: McpServer) {
    */
   server.tool(
     'get_media_file',
+    'Retrieve one named Anki media file as base64 data and, for images, as MCP image content that compatible clients can inspect. Use this when an agent needs the actual contents of a referenced media asset, not when it only needs media names or storage operations; those belong in `anki_operations`. This tool is read-only and rejects path traversal. Pass a simple filename exactly as stored in Anki media.',
     {
       filename: z.string().describe('Media filename referenced in Anki cards (e.g., "image.png")'),
     },
