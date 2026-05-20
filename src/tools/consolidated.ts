@@ -55,7 +55,7 @@ export function registerConsolidatedTools(server: McpServer) {
       deckName: z.string().optional().describe('Deck name (for create operations)'),
       modelName: z.string().optional().describe('Note type/model name (for create operations)'),
       fields: z
-        .record(z.string())
+        .record(z.string(), z.string())
         .optional()
         .describe('Field name-value pairs (for create/update)'),
       tags: z.array(z.string()).optional().describe('Tags to add/remove or set'),
@@ -66,7 +66,7 @@ export function registerConsolidatedTools(server: McpServer) {
           z.object({
             deckName: z.string(),
             modelName: z.string(),
-            fields: z.record(z.string()),
+            fields: z.record(z.string(), z.string()),
             tags: z.array(z.string()).optional(),
           })
         )

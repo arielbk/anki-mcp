@@ -290,7 +290,7 @@ export function registerMiscellaneousTools(server: McpServer) {
               ])
               .describe('Name of the AnkiConnect action to execute'),
             params: z
-              .record(z.any())
+              .record(z.string(), z.any())
               .optional()
               .describe(
                 'Parameters object for the action (structure depends on the specific action)'

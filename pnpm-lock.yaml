@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
-        version: 1.29.0(zod@3.25.76)
+        version: 1.29.0(zod@4.1.5)
       express:
         specifier: ^4.21.1
         version: 4.21.2
@@ -18,8 +18,8 @@ importers:
         specifier: ^2.2.3
         version: 2.2.3
       zod:
-        specifier: ^3.25.75
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.1.5
     devDependencies:
       '@modelcontextprotocol/inspector':
         specifier: ^0.21.2
@@ -2504,8 +2504,8 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.1.5:
+    resolution: {integrity: sha512-rcUUZqlLJgBC33IT3PNMgsCq6TzLQEG/Ei/KTCU0PedSWRMAXoOUN+4t/0H+Q8bdnLPdqUYnvboJT0bn/229qg==}
 
 snapshots:
 
@@ -2697,27 +2697,27 @@ snapshots:
 
   '@mcp-ui/client@6.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@modelcontextprotocol/ext-apps': 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@3.25.76)
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/ext-apps': 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.1.5))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.1.5)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.1.5)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      zod: 3.25.76
+      zod: 4.1.5
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - supports-color
 
-  '@modelcontextprotocol/ext-apps@1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@3.25.76)':
+  '@modelcontextprotocol/ext-apps@1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.1.5))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.1.5)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.1.5)
       '@standard-schema/spec': 1.1.0
-      zod: 3.25.76
+      zod: 4.1.5
     optionalDependencies:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@modelcontextprotocol/inspector-cli@0.21.2(zod@3.25.76)':
+  '@modelcontextprotocol/inspector-cli@0.21.2(zod@4.1.5)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.1.5)
       commander: 13.1.0
       express: 5.2.1
       spawn-rx: 5.1.2
@@ -2729,8 +2729,8 @@ snapshots:
   '@modelcontextprotocol/inspector-client@0.21.2':
     dependencies:
       '@mcp-ui/client': 6.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@modelcontextprotocol/ext-apps': 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@3.25.76)
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/ext-apps': 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.1.5))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.1.5)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.1.5)
       '@radix-ui/react-checkbox': 1.3.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@radix-ui/react-dialog': 1.1.15(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@radix-ui/react-icons': 1.3.2(react@18.3.1)
@@ -2754,7 +2754,7 @@ snapshots:
       react-simple-code-editor: 0.14.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       serve-handler: 6.1.7
       tailwind-merge: 2.6.1
-      zod: 3.25.76
+      zod: 4.1.5
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - '@types/react'
@@ -2763,7 +2763,7 @@ snapshots:
 
   '@modelcontextprotocol/inspector-server@0.21.2':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.1.5)
       cors: 2.8.6
       express: 5.2.1
       express-rate-limit: 8.5.2(express@5.2.1)
@@ -2771,7 +2771,7 @@ snapshots:
       shx: 0.3.4
       spawn-rx: 5.1.2
       ws: 8.20.1
-      zod: 3.25.76
+      zod: 4.1.5
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - bufferutil
@@ -2780,17 +2780,17 @@ snapshots:
 
   '@modelcontextprotocol/inspector@0.21.2(@types/node@24.5.2)(typescript@5.9.2)':
     dependencies:
-      '@modelcontextprotocol/inspector-cli': 0.21.2(zod@3.25.76)
+      '@modelcontextprotocol/inspector-cli': 0.21.2(zod@4.1.5)
       '@modelcontextprotocol/inspector-client': 0.21.2
       '@modelcontextprotocol/inspector-server': 0.21.2
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.1.5)
       concurrently: 9.2.1
       node-fetch: 3.3.2
       open: 10.2.0
       shell-quote: 1.8.3
       spawn-rx: 5.1.2
       ts-node: 10.9.2(@types/node@24.5.2)(typescript@5.9.2)
-      zod: 3.25.76
+      zod: 4.1.5
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - '@swc/core'
@@ -2803,7 +2803,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@3.25.76)':
+  '@modelcontextprotocol/sdk@1.29.0(zod@4.1.5)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.21)
       ajv: 8.20.0
@@ -2820,8 +2820,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
+      zod: 4.1.5
+      zod-to-json-schema: 3.25.2(zod@4.1.5)
     transitivePeerDependencies:
       - supports-color
 
@@ -4881,8 +4881,8 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-to-json-schema@3.25.2(zod@3.25.76):
+  zod-to-json-schema@3.25.2(zod@4.1.5):
     dependencies:
-      zod: 3.25.76
+      zod: 4.1.5
 
-  zod@3.25.76: {}
+  zod@4.1.5: {}

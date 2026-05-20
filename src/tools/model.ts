@@ -19,7 +19,7 @@ export function registerModelTools(server: McpServer) {
               Front: z.string().describe('Front template content'),
               Back: z.string().describe('Back template content'),
             })
-            .and(z.record(z.string()))
+            .and(z.record(z.string(), z.string()))
         )
         .describe('Array of card templates with Front and Back content'),
       css: z.string().optional().describe('Custom CSS styling for the model'),
@@ -328,7 +328,7 @@ export function registerModelTools(server: McpServer) {
           Front: z.string().describe('Front template content'),
           Back: z.string().describe('Back template content'),
         })
-        .and(z.record(z.string()))
+        .and(z.record(z.string(), z.string()))
         .describe('Template object with Front and Back content'),
     },
     async ({ modelName, template }) => {
@@ -482,6 +482,7 @@ export function registerModelTools(server: McpServer) {
       modelName: z.string().describe('Name of the model'),
       templates: z
         .record(
+          z.string(),
           z.object({
             Front: z.string().optional().describe('Front template content'),
             Back: z.string().optional().describe('Back template content'),
