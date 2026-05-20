@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
@@ -130,7 +131,9 @@ async function main() {
         server.close().catch(() => {});
       };
 
-      await server.connect(transport);
+      // SDK getter types onclose as `(() => void) | undefined` while Transport interface
+      // uses `onclose?: () => void`; these are incompatible under exactOptionalPropertyTypes.
+      await server.connect(transport as unknown as Transport);
 
       if (!transport.sessionId) {
         res.status(500).json({
