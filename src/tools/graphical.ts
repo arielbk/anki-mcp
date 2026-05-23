@@ -13,7 +13,7 @@ export function registerGraphicalTools(server: McpServer) {
       deckName: z.string().describe('Name of the deck to add the note to'),
       modelName: z.string().describe('Name of the note model/type'),
       fields: z
-        .record(z.string())
+        .record(z.string(), z.string())
         .describe('Object with field names as keys and field content as values'),
       tags: z.array(z.string()).optional().describe('Array of tags to add to the note'),
     },
