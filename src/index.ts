@@ -12,7 +12,7 @@ import {
   registerNoteResources,
   registerStatisticResources,
 } from './resources/index.js';
-import { registerConsolidatedTools } from './tools/index.js';
+import { registerConsolidatedTools, registerGraphicalTools } from './tools/index.js';
 
 function createServer(): McpServer {
   const server = new McpServer({
@@ -29,6 +29,9 @@ function createServer(): McpServer {
 
   // Register consolidated tools (6 high-level tools following MCP best practices)
   registerConsolidatedTools(server);
+
+  // Register graphical/GUI tools (issue #3)
+  registerGraphicalTools(server);
 
   return server;
 }
