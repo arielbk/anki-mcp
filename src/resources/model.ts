@@ -6,49 +6,72 @@ import { ankiClient } from '../utils/ankiClient.js';
  */
 export function registerModelResources(server: McpServer) {
   // Static resource: Get all model names
-  server.resource('model_names', 'anki:///models/names', async (uri) => {
-    try {
-      const modelNames = await ankiClient.model.modelNames();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(modelNames, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get model names: ${error instanceof Error ? error.message : String(error)}`
-      );
+  server.registerResource(
+    'model_names',
+    'anki:///models/names',
+    {
+      title: 'Note type names',
+      description: 'Names of all note types (models).',
+      mimeType: 'application/json',
+    },
+    async (uri) => {
+      try {
+        const modelNames = await ankiClient.model.modelNames();
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'application/json',
+              text: JSON.stringify(modelNames, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to get model names: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  });
+  );
 
   // Static resource: Get all model names and IDs
-  server.resource('model_names_and_ids', 'anki:///models/names-and-ids', async (uri) => {
-    try {
-      const modelNamesAndIds = await ankiClient.model.modelNamesAndIds();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(modelNamesAndIds, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get model names and IDs: ${error instanceof Error ? error.message : String(error)}`
-      );
+  server.registerResource(
+    'model_names_and_ids',
+    'anki:///models/names-and-ids',
+    {
+      title: 'Note type names and IDs',
+      description: 'Map of every note type name to its model ID.',
+      mimeType: 'application/json',
+    },
+    async (uri) => {
+      try {
+        const modelNamesAndIds = await ankiClient.model.modelNamesAndIds();
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'application/json',
+              text: JSON.stringify(modelNamesAndIds, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to get model names and IDs: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  });
+  );
 
   // Resource template: Get models by ID
-  server.resource(
+  server.registerResource(
     'models_by_id',
     new ResourceTemplate('anki:///models/by-id/{modelIds}', { list: undefined }),
+    {
+      title: 'Note types by ID',
+      description: 'Full definitions of note types for comma-separated model IDs.',
+      mimeType: 'application/json',
+    },
     async (uri, { modelIds }) => {
       const modelIdsString = Array.isArray(modelIds) ? modelIds[0] : modelIds;
       if (!modelIdsString) {
@@ -87,9 +110,14 @@ export function registerModelResources(server: McpServer) {
   );
 
   // Resource template: Get models by name
-  server.resource(
+  server.registerResource(
     'models_by_name',
     new ResourceTemplate('anki:///models/by-name/{modelNames}', { list: undefined }),
+    {
+      title: 'Note types by name',
+      description: 'Full definitions of note types for comma-separated model names.',
+      mimeType: 'application/json',
+    },
     async (uri, { modelNames }) => {
       const modelNamesString = Array.isArray(modelNames) ? modelNames[0] : modelNames;
       if (!modelNamesString) {
@@ -121,9 +149,14 @@ export function registerModelResources(server: McpServer) {
   );
 
   // Resource template: Get model field names
-  server.resource(
+  server.registerResource(
     'model_field_names',
     new ResourceTemplate('anki:///models/{modelName}/fields/names', { list: undefined }),
+    {
+      title: 'Note type fields',
+      description: 'Ordered field names of the named note type.',
+      mimeType: 'application/json',
+    },
     async (uri, { modelName }) => {
       const modelNameString = Array.isArray(modelName) ? modelName[0] : modelName;
       if (!modelNameString) {
@@ -150,9 +183,14 @@ export function registerModelResources(server: McpServer) {
   );
 
   // Resource template: Get model field fonts
-  server.resource(
+  server.registerResource(
     'model_field_fonts',
     new ResourceTemplate('anki:///models/{modelName}/fields/fonts', { list: undefined }),
+    {
+      title: 'Note type field fonts',
+      description: 'Editor font and size for each field of the named note type.',
+      mimeType: 'application/json',
+    },
     async (uri, { modelName }) => {
       const modelNameString = Array.isArray(modelName) ? modelName[0] : modelName;
       if (!modelNameString) {
@@ -179,9 +217,15 @@ export function registerModelResources(server: McpServer) {
   );
 
   // Resource template: Get model fields on templates
-  server.resource(
+  server.registerResource(
     'model_fields_on_templates',
     new ResourceTemplate('anki:///models/{modelName}/fields/templates', { list: undefined }),
+    {
+      title: 'Fields used by templates',
+      description:
+        'Which fields appear on the front and back of each card template of the named note type.',
+      mimeType: 'application/json',
+    },
     async (uri, { modelName }) => {
       const modelNameString = Array.isArray(modelName) ? modelName[0] : modelName;
       if (!modelNameString) {
@@ -210,9 +254,14 @@ export function registerModelResources(server: McpServer) {
   );
 
   // Resource template: Get model styling
-  server.resource(
+  server.registerResource(
     'model_styling',
     new ResourceTemplate('anki:///models/{modelName}/styling', { list: undefined }),
+    {
+      title: 'Note type CSS',
+      description: 'Card styling (CSS) of the named note type.',
+      mimeType: 'application/json',
+    },
     async (uri, { modelName }) => {
       const modelNameString = Array.isArray(modelName) ? modelName[0] : modelName;
       if (!modelNameString) {
@@ -239,9 +288,14 @@ export function registerModelResources(server: McpServer) {
   );
 
   // Resource template: Get model templates
-  server.resource(
+  server.registerResource(
     'model_templates',
     new ResourceTemplate('anki:///models/{modelName}/templates', { list: undefined }),
+    {
+      title: 'Note type templates',
+      description: 'Front and back HTML templates of each card type of the named note type.',
+      mimeType: 'application/json',
+    },
     async (uri, { modelName }) => {
       const modelNameString = Array.isArray(modelName) ? modelName[0] : modelName;
       if (!modelNameString) {

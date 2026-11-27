@@ -25,9 +25,14 @@ function parseCardIds(uri: URL): number[] {
  */
 export function registerCardResources(server: McpServer) {
   // Resource template: Find cards by query
-  server.resource(
+  server.registerResource(
     'find_cards',
     new ResourceTemplate('anki:///cards/search/{query}', { list: undefined }),
+    {
+      title: 'Find cards',
+      description: 'Card IDs matching an Anki search query (URL-encoded).',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const query = decodeURIComponent(uri.pathname.split('/').pop() || '');
@@ -54,9 +59,14 @@ export function registerCardResources(server: McpServer) {
   );
 
   // Resource template: Get detailed information for specific cards
-  server.resource(
+  server.registerResource(
     'cards_info',
     new ResourceTemplate('anki:///cards/{cardIds}/info', { list: undefined }),
+    {
+      title: 'Card details',
+      description: 'Full info (fields, deck, scheduling) for comma-separated card IDs.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const cardIds = parseCardIds(uri);
@@ -80,9 +90,14 @@ export function registerCardResources(server: McpServer) {
   );
 
   // Resource template: Check if cards are due
-  server.resource(
+  server.registerResource(
     'cards_due_status',
     new ResourceTemplate('anki:///cards/{cardIds}/due', { list: undefined }),
+    {
+      title: 'Card due status',
+      description: 'Whether each of the comma-separated card IDs is currently due.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const cardIds = parseCardIds(uri);
@@ -111,9 +126,14 @@ export function registerCardResources(server: McpServer) {
   );
 
   // Resource template: Check if cards are suspended
-  server.resource(
+  server.registerResource(
     'cards_suspend_status',
     new ResourceTemplate('anki:///cards/{cardIds}/suspended', { list: undefined }),
+    {
+      title: 'Card suspended status',
+      description: 'Whether each of the comma-separated card IDs is suspended.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const cardIds = parseCardIds(uri);
@@ -142,9 +162,14 @@ export function registerCardResources(server: McpServer) {
   );
 
   // Resource template: Get modification time for cards
-  server.resource(
+  server.registerResource(
     'cards_mod_time',
     new ResourceTemplate('anki:///cards/{cardIds}/mod-time', { list: undefined }),
+    {
+      title: 'Card modification times',
+      description: 'Last modification time for comma-separated card IDs.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const cardIds = parseCardIds(uri);
@@ -168,9 +193,14 @@ export function registerCardResources(server: McpServer) {
   );
 
   // Resource template: Get note IDs for cards
-  server.resource(
+  server.registerResource(
     'cards_to_notes',
     new ResourceTemplate('anki:///cards/{cardIds}/notes', { list: undefined }),
+    {
+      title: 'Notes for cards',
+      description: 'Note IDs that own the comma-separated card IDs.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const cardIds = parseCardIds(uri);
@@ -194,9 +224,14 @@ export function registerCardResources(server: McpServer) {
   );
 
   // Resource template: Get ease factors for cards
-  server.resource(
+  server.registerResource(
     'cards_ease_factors',
     new ResourceTemplate('anki:///cards/{cardIds}/ease-factors', { list: undefined }),
+    {
+      title: 'Card ease factors',
+      description: 'Ease factor of each of the comma-separated card IDs.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const cardIds = parseCardIds(uri);
@@ -225,9 +260,15 @@ export function registerCardResources(server: McpServer) {
   );
 
   // Resource template: Get intervals for cards
-  server.resource(
+  server.registerResource(
     'cards_intervals',
     new ResourceTemplate('anki:///cards/{cardIds}/intervals', { list: undefined }),
+    {
+      title: 'Card intervals',
+      description:
+        'Review interval of each of the comma-separated card IDs; add ?complete=true for the full interval history.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const cardIds = parseCardIds(uri);

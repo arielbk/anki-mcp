@@ -6,49 +6,72 @@ import { ankiClient } from '../utils/ankiClient.js';
  */
 export function registerDeckResources(server: McpServer) {
   // Static resource: Get all deck names
-  server.resource('deck_names', 'anki:///decks/names', async (uri) => {
-    try {
-      const deckNames = await ankiClient.deck.deckNames();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(deckNames, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get deck names: ${error instanceof Error ? error.message : String(error)}`
-      );
+  server.registerResource(
+    'deck_names',
+    'anki:///decks/names',
+    {
+      title: 'Deck names',
+      description: 'Names of all decks in the collection.',
+      mimeType: 'application/json',
+    },
+    async (uri) => {
+      try {
+        const deckNames = await ankiClient.deck.deckNames();
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'application/json',
+              text: JSON.stringify(deckNames, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to get deck names: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  });
+  );
 
   // Static resource: Get all deck names and IDs
-  server.resource('deck_names_and_ids', 'anki:///decks/names-and-ids', async (uri) => {
-    try {
-      const deckNamesAndIds = await ankiClient.deck.deckNamesAndIds();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(deckNamesAndIds, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get deck names and IDs: ${error instanceof Error ? error.message : String(error)}`
-      );
+  server.registerResource(
+    'deck_names_and_ids',
+    'anki:///decks/names-and-ids',
+    {
+      title: 'Deck names and IDs',
+      description: 'Map of every deck name to its deck ID.',
+      mimeType: 'application/json',
+    },
+    async (uri) => {
+      try {
+        const deckNamesAndIds = await ankiClient.deck.deckNamesAndIds();
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'application/json',
+              text: JSON.stringify(deckNamesAndIds, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to get deck names and IDs: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  });
+  );
 
   // Resource template: Get deck configuration for a specific deck
-  server.resource(
+  server.registerResource(
     'deck_config',
     new ResourceTemplate('anki:///decks/{deckName}/config', { list: undefined }),
+    {
+      title: 'Deck options',
+      description: 'Options group (daily limits, learning steps, etc.) applied to the named deck.',
+      mimeType: 'application/json',
+    },
     async (uri, { deckName }) => {
       const deckNameString = Array.isArray(deckName) ? deckName[0] : deckName;
       if (!deckNameString) {
@@ -75,9 +98,14 @@ export function registerDeckResources(server: McpServer) {
   );
 
   // Resource template: Get deck statistics for specific decks
-  server.resource(
+  server.registerResource(
     'deck_stats',
     new ResourceTemplate('anki:///decks/{deckNames}/stats', { list: undefined }),
+    {
+      title: 'Deck statistics',
+      description: 'New, learning and review counts for one or more decks (comma-separated names).',
+      mimeType: 'application/json',
+    },
     async (uri, { deckNames }) => {
       const deckNamesString = Array.isArray(deckNames) ? deckNames[0] : deckNames;
       if (!deckNamesString) {
@@ -109,9 +137,14 @@ export function registerDeckResources(server: McpServer) {
   );
 
   // Resource template: Get decks containing specific cards
-  server.resource(
+  server.registerResource(
     'decks_by_cards',
     new ResourceTemplate('anki:///decks/by-cards/{cardIds}', { list: undefined }),
+    {
+      title: 'Decks for cards',
+      description: 'Which deck each of the given card IDs (comma-separated) belongs to.',
+      mimeType: 'application/json',
+    },
     async (uri, { cardIds }) => {
       const cardIdsString = Array.isArray(cardIds) ? cardIds[0] : cardIds;
       if (!cardIdsString) {
