@@ -121,6 +121,14 @@ AnkiConnect works out of the box, but you can customize settings:
 
 > **💡 Pro Tip:** You can test your setup by asking Claude simple questions like _"How many Anki decks do I have?"_ or _"What's in my largest deck?"_
 
+### Use with Claude Code
+
+```bash
+claude mcp add --scope user anki -- npx -y @arielbk/anki-mcp
+```
+
+The tools only appear in a **newly started** Claude Code session; `/clear` is not enough. Run `/mcp` to check that `anki` is connected.
+
 ### Option 2: Development Setup
 
 1. **Clone the repository**
@@ -214,23 +222,63 @@ The server provides **7 intuitive tools** that cover everything you need:
 ### 📝 **Manage Flashcards**
 Create, update, delete, and search your flashcards. Perfect for content creation, bulk updates, and organization.
 
+#### Batch creation (`create_batch`)
+
+- **Defaults:** top-level `deckName`, `modelName` and `tags` apply to every note. A note's own `deckName`/`modelName` override the defaults; its `tags` are added to the default tags.
+- **Chunking:** notes are sent one chunk at a time (`chunkSize`, default 10, max 50) with a short pause between chunks, so large imports don't overload Anki.
+- **Per-note results:** every note is reported as `#n "first 40 chars of the first field"` with its new note ID or the reason it failed (duplicate, unknown note type, wrong field names, empty first field, ...).
+- **Partial failure:** if Anki stops responding partway, the batch stops and reports which notes were saved, which chunk may or may not have been saved, and which notes to resend.
+- **Duplicates:** `allowDuplicate: true` allows notes whose first field already exists; `duplicateScope: "deck"` checks for duplicates only in the target deck (default: whole collection).
+- **Dry run:** `dryRun: true` validates every note (note type, field names, duplicates) without writing anything.
+
+#### Import from a file
+
+Instead of `notes`, pass `filePath` (absolute path) to a `.json`, `.csv` or `.tsv` file. An agent can draft cards to a file for you to review, then import them in one call without sending every card through the conversation.
+
+- **JSON:** an array of notes, same shape as `notes`: `[{ "fields": { "Front": "...", "Back": "..." }, "tags": ["x"] }]`
+- **CSV / TSV:** the header row holds the field names. Optional `tags` (space-separated), `deck` and `model` columns set those per row. Quoted fields may contain commas, tabs, newlines and `""` for a literal quote.
+
+```csv
+Front,Back,tags
+"What does <code>Array.prototype.map</code> return?",A new array,js arrays
+Capital of France,Paris,geography
+```
+
+```json
+{ "operation": "create_batch", "filePath": "/Users/me/cards.csv", "deckName": "Interview prep", "modelName": "Basic", "dryRun": true }
+```
+
 ### 🎯 **Study Sessions**
 Run interactive quiz sessions, manage card scheduling, and track which cards need review.
 
 ### 📚 **Manage Decks**
 Create and organize decks, move cards around, and configure deck settings.
 
+#### Per-deck daily limits
+
+Decks usually share an options preset (e.g. "Default"), so changing it changes every deck that uses it. To give one deck its own limits, use `create` with `newPerDay` / `reviewsPerDay`, or `set_limits` on an existing deck:
+
+```json
+{ "operation": "set_limits", "deckName": "Interview prep", "newPerDay": 15 }
+```
+
+If the deck uses a shared preset, it is cloned into a new preset named after the deck, assigned to that deck only, and then changed. Other decks are not affected.
+
 ### 📊 **Get Analytics**
 Dive into your study statistics, review history, and learning patterns.
 
 ### 🎨 **Manage Models**
-Customize note types, add fields, modify templates, and style your cards.
+Customize note types, add fields, modify templates, and style your cards. `list` shows each note type's field names, so agents don't have to guess `Front`/`Back`.
 
 ### 🔧 **Anki Operations**
 Handle sync, media files, imports/exports, and other utility operations.
 
 ### 🖼️ **Get Media File**
 Retrieve media files (images, audio, etc.) from your Anki collection. AI assistants can analyze images directly (though they won't display in the UI).
+
+## ✍️ Prompt: writing good flashcards
+
+The server also provides an MCP prompt, `writing_good_flashcards` (optional `topic` argument), with guidelines for effective cards: the minimum information principle, one fact per card, no yes/no questions, several angles on one idea, one cloze per list item in a fixed order, and only making cards for material you already understand. It is based on Andy Matuschak's [How to write good prompts](https://andymatuschak.org/prompts/) and SuperMemo's [Twenty rules of formulating knowledge](https://www.supermemo.com/en/blog/twenty-rules-of-formulating-knowledge). In Claude Code it is available as a slash command (`/mcp__anki__writing_good_flashcards`).
 
 > **💡 Pro Tip:** Many operations support pagination to prevent overwhelming your context window. Use `limit` and `offset` parameters when working with large result sets.
 
@@ -242,6 +290,9 @@ pnpm dev
 
 # Lint the code
 pnpm lint
+
+# Run unit tests (AnkiConnect is mocked; tests never touch your collection)
+pnpm test
 
 # Format the code
 pnpm format
@@ -284,6 +335,7 @@ For advanced users, you can pass additional parameters:
 **Common Issues:**
 
 - **"Failed to connect to AnkiConnect"**: Ensure Anki is running and AnkiConnect plugin is installed
+- **"Couldn't reach AnkiConnect at http://127.0.0.1:8765. Is Anki running?"**: Anki is not running or quit during the last operation. Restart it; if a `create_batch` was interrupted, its result lists which notes were saved and which to resend.
 - **"No decks found"**: Make sure you have at least one deck in Anki
 - **Claude doesn't respond**: Restart Claude Desktop after configuration changes
 - **Permission errors**: Check that the global npm install worked correctly with `npm list -g @arielbk/anki-mcp`
