@@ -1,6 +1,22 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ankiClient } from '../utils/ankiClient.js';
+import {
+  DEFAULT_CHUNK_SIZE,
+  formatBatchReport,
+  resolveNotes,
+  runBatch,
+  type NoteInput,
+} from '../utils/batch.js';
+import { formatDeckLimits, setDeckLimits } from '../utils/deckLimits.js';
+import { errorMessage, explainWriteFailure } from '../utils/errors.js';
+import { readNotesFile, resolveFilePath } from '../utils/notesFile.js';
+import {
+  DESCRIPTIONS,
+  DESTRUCTIVE_WRITE,
+  DESTRUCTIVE_WRITE_OPEN_WORLD,
+  READ_ONLY,
+} from './descriptions.js';
 
 /**
  * MIME type mapping for common media file extensions
@@ -23,6 +39,25 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 /**
+ * Builds the error thrown by a tool. For write operations it pings
+ * AnkiConnect so the message says whether Anki is down or rejected the
+ * request.
+ */
+async function toolError(tool: string, error: unknown, isWrite: boolean): Promise<Error> {
+  const message = isWrite ? await explainWriteFailure(ankiClient, error) : errorMessage(error);
+  return new Error(`${tool} failed: ${message}`);
+}
+
+const noteSchema = z.object({
+  deckName: z.string().optional().describe('Overrides the top-level deckName for this note'),
+  modelName: z.string().optional().describe('Overrides the top-level modelName for this note'),
+  fields: z
+    .record(z.string(), z.string())
+    .describe('Field name -> value (HTML allowed), e.g. { "Front": "...", "Back": "..." }'),
+  tags: z.array(z.string()).optional().describe('Added to the top-level tags'),
+});
+
+/**
  * Register consolidated, high-level tools with the MCP server
  * Following MCP best practices: domain-aware, intentional tool design
  * instead of exposing every low-level API endpoint
@@ -33,91 +68,152 @@ export function registerConsolidatedTools(server: McpServer) {
    * High-level flashcard (note/card) management
    * Covers: create, update, delete, find, tag operations
    */
-  server.tool(
+  server.registerTool(
     'manage_flashcards',
-    'Create, update, delete, search, inspect, and tag Anki flashcards through one high-level note/card workflow. Use this for note lifecycle work and card lookup, not for deck structure, note-type schema changes, or study scheduling. Mutating operations change the local Anki collection immediately; searches are read-only. Choose `operation` first, then provide the operation-specific IDs, query, fields, tags, or pagination inputs described by the schema.',
     {
-      operation: z
-        .enum([
-          'create',
-          'create_batch',
-          'update',
-          'delete',
-          'find',
-          'get_info',
-          'add_tags',
-          'remove_tags',
-          'clear_empty',
-        ])
-        .describe('The flashcard operation to perform'),
+      title: 'Manage flashcards',
+      description: DESCRIPTIONS.manage_flashcards,
+      annotations: DESTRUCTIVE_WRITE,
+      inputSchema: {
+        operation: z
+          .enum([
+            'create',
+            'create_batch',
+            'update',
+            'delete',
+            'find',
+            'get_info',
+            'add_tags',
+            'remove_tags',
+            'clear_empty',
+          ])
+          .describe('Which operation to run; see the tool description for required parameters'),
 
-      // For create operations
-      deckName: z.string().optional().describe('Deck name (for create operations)'),
-      modelName: z.string().optional().describe('Note type/model name (for create operations)'),
-      fields: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe('Field name-value pairs (for create/update)'),
-      tags: z.array(z.string()).optional().describe('Tags to add/remove or set'),
+        // create / create_batch
+        deckName: z
+          .string()
+          .optional()
+          .describe(
+            'create: target deck (required). create_batch: default deck for notes without their own deckName'
+          ),
+        modelName: z
+          .string()
+          .optional()
+          .describe(
+            'create: note type (required), e.g. "Basic". create_batch: default note type for notes without their own. Use manage_models list for field names'
+          ),
+        fields: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe(
+            'create/update: field name -> value (HTML allowed). Names must match the note type, e.g. { "Front": "...", "Back": "..." }'
+          ),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "create: tags for the note. create_batch: added to every note. update: replaces the note's tags. add_tags/remove_tags: tags to add/remove"
+          ),
 
-      // For batch create
-      notes: z
-        .array(
-          z.object({
-            deckName: z.string(),
-            modelName: z.string(),
-            fields: z.record(z.string(), z.string()),
-            tags: z.array(z.string()).optional(),
-          })
-        )
-        .optional()
-        .describe('Array of notes to create (for create_batch)'),
+        // create_batch
+        notes: z
+          .array(noteSchema)
+          .optional()
+          .describe('create_batch: notes to add (or use filePath instead)'),
+        filePath: z
+          .string()
+          .optional()
+          .describe(
+            'create_batch: absolute path to a .json (array of notes like `notes`), .csv or .tsv file. CSV/TSV: header row = field names, plus optional "tags" (space-separated), "deck" and "model" columns. Use instead of notes'
+          ),
+        dryRun: z
+          .boolean()
+          .optional()
+          .describe(
+            'create_batch: validate every note and report problems without writing anything'
+          ),
+        chunkSize: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe(`create_batch: notes per AnkiConnect request (default ${DEFAULT_CHUNK_SIZE})`),
+        allowDuplicate: z
+          .boolean()
+          .optional()
+          .describe(
+            'create/create_batch: add notes even if the first field duplicates an existing note (default false)'
+          ),
+        duplicateScope: z
+          .enum(['deck', 'collection'])
+          .optional()
+          .describe(
+            'create/create_batch: where to look for duplicates: "collection" (default) or only the target "deck"'
+          ),
 
-      // For update/delete operations
-      noteId: z.number().optional().describe('Note ID (for update/delete single note)'),
-      noteIds: z.array(z.number()).optional().describe('Note IDs (for delete multiple)'),
+        // update / delete / tags
+        noteId: z.number().optional().describe('update: ID of the note to change'),
+        noteIds: z
+          .array(z.number())
+          .optional()
+          .describe('delete/add_tags/remove_tags: note IDs to act on'),
 
-      // For find operations
-      query: z.string().optional().describe('Anki search query (for find operation)'),
-      includeDetails: z.boolean().optional().describe('Include detailed note info (for find)'),
-      limit: z
-        .number()
-        .optional()
-        .describe('Max results to return (default: 50, recommended to prevent context overflow)'),
-      offset: z
-        .number()
-        .optional()
-        .describe('Number of results to skip for pagination (default: 0)'),
+        // find
+        query: z
+          .string()
+          .optional()
+          .describe('find: Anki search query, e.g. "deck:Spanish tag:verbs added:7"'),
+        includeDetails: z
+          .boolean()
+          .optional()
+          .describe('find: include full note fields/tags instead of only IDs (larger output)'),
+        limit: z.number().optional().describe('find: max results per page (default 50)'),
+        offset: z.number().optional().describe('find: results to skip, for paging (default 0)'),
 
-      // For get_info
-      cardIds: z.array(z.number()).optional().describe('Card IDs to get info for'),
+        // get_info
+        cardIds: z.array(z.number()).optional().describe('get_info: card IDs (max 50)'),
+      },
     },
-    async ({
-      operation,
-      deckName,
-      modelName,
-      fields,
-      tags,
-      notes,
-      noteId,
-      noteIds,
-      query,
-      includeDetails,
-      limit = 50,
-      offset = 0,
-      cardIds,
-    }) => {
+    async (
+      {
+        operation,
+        deckName,
+        modelName,
+        fields,
+        tags,
+        notes,
+        filePath,
+        dryRun,
+        chunkSize,
+        allowDuplicate,
+        duplicateScope,
+        noteId,
+        noteIds,
+        query,
+        includeDetails,
+        limit = 50,
+        offset = 0,
+        cardIds,
+      },
+      extra
+    ) => {
+      const isWrite = !['find', 'get_info'].includes(operation) && !dryRun;
       try {
         switch (operation) {
           case 'create': {
             if (!deckName || !modelName || !fields) {
               throw new Error('create requires deckName, modelName, and fields');
             }
+            const options: { allowDuplicate?: boolean; duplicateScope?: string } = {};
+            if (allowDuplicate !== undefined) options.allowDuplicate = allowDuplicate;
+            if (duplicateScope !== undefined) options.duplicateScope = duplicateScope;
             const note = {
               deckName,
               modelName,
               fields,
-              tags: tags || [],
+              tags: tags ?? [],
+              ...(Object.keys(options).length > 0 ? { options } : {}),
             };
             const newNoteId = await ankiClient.note.addNote({ note });
             if (newNoteId === null) {
@@ -134,23 +230,55 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           case 'create_batch': {
-            if (!notes || notes.length === 0) {
-              throw new Error('create_batch requires notes array');
+            if (notes && filePath) {
+              throw new Error('create_batch takes either notes or filePath, not both');
             }
-            const formattedNotes = notes.map((note) => ({
-              ...note,
-              tags: note.tags || [],
-            }));
-            const results = await ankiClient.note.addNotes({ notes: formattedNotes });
-            const successCount = results?.filter((result) => result !== null).length || 0;
-            const failureCount = (results?.length || 0) - successCount;
+            let inputNotes: NoteInput[];
+            let source: string | undefined;
+            if (filePath) {
+              inputNotes = await readNotesFile(filePath);
+              source = resolveFilePath(filePath);
+            } else if (notes) {
+              inputNotes = notes.map((n) => {
+                const note: NoteInput = { fields: n.fields };
+                if (n.deckName) note.deckName = n.deckName;
+                if (n.modelName) note.modelName = n.modelName;
+                if (n.tags) note.tags = n.tags;
+                return note;
+              });
+            } else {
+              throw new Error('create_batch requires notes or filePath');
+            }
+            if (inputNotes.length === 0) {
+              throw new Error(`create_batch: no notes found${source ? ` in ${source}` : ''}`);
+            }
+
+            const resolved = resolveNotes(inputNotes, { deckName, modelName, tags });
+            const progressToken = extra._meta?.progressToken;
+            const report = await runBatch(ankiClient, resolved, {
+              chunkSize,
+              dryRun,
+              allowDuplicate,
+              duplicateScope,
+              onProgress:
+                progressToken === undefined
+                  ? undefined
+                  : (done, total) =>
+                      extra
+                        .sendNotification({
+                          method: 'notifications/progress',
+                          params: {
+                            progressToken,
+                            progress: done,
+                            total,
+                            message: `Added ${done} of ${total} notes`,
+                          },
+                        })
+                        .catch(() => {}),
+            });
             return {
-              content: [
-                {
-                  type: 'text',
-                  text: `✓ Batch create: ${successCount} succeeded, ${failureCount} failed\nResults: ${JSON.stringify(results)}`,
-                },
-              ],
+              content: [{ type: 'text', text: formatBatchReport(report, source) }],
+              ...(report.abortedReason ? { isError: true } : {}),
             };
           }
 
@@ -299,9 +427,7 @@ export function registerConsolidatedTools(server: McpServer) {
             throw new Error(`Unknown operation: ${operation}`);
         }
       } catch (error) {
-        throw new Error(
-          `manage_flashcards failed: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw await toolError('manage_flashcards', error, isWrite);
       }
     }
   );
@@ -311,31 +437,40 @@ export function registerConsolidatedTools(server: McpServer) {
    * Interactive quiz and review operations
    * Covers: finding cards to study, answering cards, reviewing
    */
-  server.tool(
+  server.registerTool(
     'study_session',
-    'Find due cards and apply review-state actions such as answering, suspending, unsuspending, resetting, and relearning cards. Use this for scheduling and review flow, not for editing note content or reorganizing decks. Several operations mutate card state in Anki immediately; `find_due` and `check_status` are read-only. Select `operation`, then pass either `query`, `cardIds`, or `answers` as required for that action.',
     {
-      operation: z
-        .enum(['find_due', 'answer', 'suspend', 'unsuspend', 'check_status', 'forget', 'relearn'])
-        .describe('Study session operation'),
+      title: 'Study session and scheduling',
+      description: DESCRIPTIONS.study_session,
+      annotations: DESTRUCTIVE_WRITE,
+      inputSchema: {
+        operation: z
+          .enum(['find_due', 'answer', 'suspend', 'unsuspend', 'check_status', 'forget', 'relearn'])
+          .describe('Which operation to run; see the tool description for required parameters'),
 
-      query: z.string().optional().describe('Search query to find cards (for find_due)'),
+        query: z
+          .string()
+          .optional()
+          .describe('find_due: Anki search query, e.g. "deck:Spanish" or "tag:verbs"'),
 
-      cardIds: z.array(z.number()).optional().describe('Card IDs to operate on'),
+        cardIds: z
+          .array(z.number())
+          .optional()
+          .describe('check_status/suspend/unsuspend/forget/relearn: card IDs (not note IDs)'),
 
-      answers: z
-        .array(
-          z.object({
-            cardId: z.number(),
-            ease: z.number().min(1).max(4).describe('1=Again, 2=Hard, 3=Good, 4=Easy'),
-          })
-        )
-        .optional()
-        .describe('Card answers (for answer operation)'),
-
-      days: z.string().optional().describe('Days from today for due date (for reschedule)'),
+        answers: z
+          .array(
+            z.object({
+              cardId: z.number(),
+              ease: z.number().min(1).max(4).describe('1=Again, 2=Hard, 3=Good, 4=Easy'),
+            })
+          )
+          .optional()
+          .describe('answer: one entry per reviewed card'),
+      },
     },
     async ({ operation, query, cardIds, answers }) => {
+      const isWrite = !['find_due', 'check_status'].includes(operation);
       try {
         switch (operation) {
           case 'find_due': {
@@ -472,9 +607,7 @@ export function registerConsolidatedTools(server: McpServer) {
             throw new Error(`Unknown operation: ${operation}`);
         }
       } catch (error) {
-        throw new Error(
-          `study_session failed: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw await toolError('study_session', error, isWrite);
       }
     }
   );
@@ -483,24 +616,80 @@ export function registerConsolidatedTools(server: McpServer) {
    * TOOL 3: manage_decks
    * Deck creation, configuration, and organization
    */
-  server.tool(
+  server.registerTool(
     'manage_decks',
-    'Create, delete, list, inspect, move cards between, and configure Anki decks. Use this for deck-level organization, not for editing flashcard fields, note types, or study answers. Create, delete, move, and config operations mutate the collection; list and stats/config reads do not. Set `operation` first and supply the matching deck names, card IDs, target deck, or config ID.',
     {
-      operation: z
-        .enum(['create', 'delete', 'list', 'get_stats', 'move_cards', 'get_config', 'set_config'])
-        .describe('Deck management operation'),
+      title: 'Manage decks',
+      description: DESCRIPTIONS.manage_decks,
+      annotations: DESTRUCTIVE_WRITE,
+      inputSchema: {
+        operation: z
+          .enum([
+            'create',
+            'delete',
+            'list',
+            'get_stats',
+            'move_cards',
+            'get_config',
+            'set_config',
+            'set_limits',
+          ])
+          .describe('Which operation to run; see the tool description for required parameters'),
 
-      deckName: z.string().optional().describe('Deck name'),
-      deckNames: z.array(z.string()).optional().describe('Deck names (for batch operations)'),
-      deleteCards: z.boolean().optional().describe('Delete cards when deleting deck'),
+        deckName: z
+          .string()
+          .optional()
+          .describe(
+            'create/set_limits/get_stats/get_config: deck name; use "Parent::Child" for subdecks'
+          ),
+        deckNames: z
+          .array(z.string())
+          .optional()
+          .describe('delete/set_config: deck names to act on'),
+        deleteCards: z
+          .boolean()
+          .optional()
+          .describe(
+            'delete: must be true or omitted; AnkiConnect always deletes a deck together with its cards'
+          ),
 
-      cardIds: z.array(z.number()).optional().describe('Card IDs to move'),
-      targetDeck: z.string().optional().describe('Target deck for moving cards'),
+        newPerDay: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('create/set_limits: max new cards per day for this deck only'),
+        reviewsPerDay: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('create/set_limits: max reviews per day for this deck only'),
 
-      configId: z.number().optional().describe('Config ID to apply'),
+        cardIds: z.array(z.number()).optional().describe('move_cards: card IDs to move'),
+        targetDeck: z
+          .string()
+          .optional()
+          .describe('move_cards: destination deck (created if missing)'),
+
+        configId: z
+          .number()
+          .optional()
+          .describe('set_config: ID of an existing options preset (see get_config)'),
+      },
     },
-    async ({ operation, deckName, deckNames, deleteCards, cardIds, targetDeck, configId }) => {
+    async ({
+      operation,
+      deckName,
+      deckNames,
+      deleteCards,
+      newPerDay,
+      reviewsPerDay,
+      cardIds,
+      targetDeck,
+      configId,
+    }) => {
+      const isWrite = !['list', 'get_stats', 'get_config'].includes(operation);
       try {
         switch (operation) {
           case 'create': {
@@ -508,29 +697,46 @@ export function registerConsolidatedTools(server: McpServer) {
               throw new Error('create requires deckName');
             }
             const result = await ankiClient.deck.createDeck({ deck: deckName });
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `✓ Created deck "${deckName}" (ID: ${result})`,
-                },
-              ],
-            };
+            let text = `✓ Created deck "${deckName}" (ID: ${String(result)})`;
+            if (newPerDay !== undefined || reviewsPerDay !== undefined) {
+              const limits = await setDeckLimits(ankiClient, deckName, {
+                newPerDay,
+                reviewsPerDay,
+              });
+              text += `\n${formatDeckLimits(deckName, limits)}`;
+            }
+            return { content: [{ type: 'text', text }] };
+          }
+
+          case 'set_limits': {
+            if (!deckName) {
+              throw new Error('set_limits requires deckName');
+            }
+            if (newPerDay === undefined && reviewsPerDay === undefined) {
+              throw new Error('set_limits requires newPerDay and/or reviewsPerDay');
+            }
+            const limits = await setDeckLimits(ankiClient, deckName, { newPerDay, reviewsPerDay });
+            return { content: [{ type: 'text', text: formatDeckLimits(deckName, limits) }] };
           }
 
           case 'delete': {
             if (!deckNames || deckNames.length === 0) {
               throw new Error('delete requires deckNames');
             }
+            if (deleteCards === false) {
+              throw new Error(
+                'AnkiConnect can only delete a deck together with its cards. Move the cards elsewhere first with move_cards, then delete.'
+              );
+            }
             await ankiClient.deck.deleteDecks({
               decks: deckNames,
-              cardsToo: (deleteCards ?? true) as true,
+              cardsToo: true,
             });
             return {
               content: [
                 {
                   type: 'text',
-                  text: `✓ Deleted deck(s): ${deckNames.join(', ')}${deleteCards !== false ? ' (including cards)' : ''}`,
+                  text: `✓ Deleted deck(s) and their cards: ${deckNames.join(', ')}`,
                 },
               ],
             };
@@ -615,9 +821,7 @@ export function registerConsolidatedTools(server: McpServer) {
             throw new Error(`Unknown operation: ${operation}`);
         }
       } catch (error) {
-        throw new Error(
-          `manage_decks failed: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw await toolError('manage_decks', error, isWrite);
       }
     }
   );
@@ -626,28 +830,39 @@ export function registerConsolidatedTools(server: McpServer) {
    * TOOL 4: get_analytics
    * Statistics and learning insights
    */
-  server.tool(
+  server.registerTool(
     'get_analytics',
-    'Read study analytics and review history for decks, the collection, or specific cards. Use this when the agent needs reporting or diagnostics, not when it needs to mutate Anki data. This tool is read-only but some scopes can return large payloads, so prefer the narrowest scope and explicit card IDs or timestamps when available. Choose `scope`, then provide the deck, cards, or review start timestamp required by that scope.',
     {
-      scope: z
-        .enum([
-          'deck_stats',
-          'collection_stats',
-          'reviews_by_day',
-          'reviews_today',
-          'card_reviews',
-          'card_details',
-        ])
-        .describe('Analytics scope'),
+      title: 'Study analytics',
+      description: DESCRIPTIONS.get_analytics,
+      annotations: READ_ONLY,
+      inputSchema: {
+        scope: z
+          .enum([
+            'deck_stats',
+            'collection_stats',
+            'reviews_by_day',
+            'reviews_today',
+            'card_reviews',
+            'card_details',
+          ])
+          .describe('Which statistics to read; see the tool description for required parameters'),
 
-      deckName: z.string().optional().describe('Deck name for deck-specific stats'),
-      cardIds: z.array(z.number()).optional().describe('Card IDs for detailed analysis'),
-      startTimestamp: z.number().optional().describe('Start timestamp for review history'),
-      wholeCollection: z
-        .boolean()
-        .optional()
-        .describe('Get whole collection stats vs current deck'),
+        deckName: z.string().optional().describe('deck_stats/card_reviews: deck name'),
+        cardIds: z.array(z.number()).optional().describe('card_details: card IDs'),
+        startTimestamp: z
+          .number()
+          .optional()
+          .describe(
+            'card_reviews: only reviews after this review ID (epoch milliseconds), e.g. Date.now() - 7 days'
+          ),
+        wholeCollection: z
+          .boolean()
+          .optional()
+          .describe(
+            'collection_stats: true (default) for all decks, false for the current deck only'
+          ),
+      },
     },
     async ({ scope, deckName, cardIds, startTimestamp, wholeCollection }) => {
       try {
@@ -752,9 +967,7 @@ export function registerConsolidatedTools(server: McpServer) {
             throw new Error(`Unknown scope: ${scope}`);
         }
       } catch (error) {
-        throw new Error(
-          `get_analytics failed: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw await toolError('get_analytics', error, false);
       }
     }
   );
@@ -763,53 +976,68 @@ export function registerConsolidatedTools(server: McpServer) {
    * TOOL 5: manage_models
    * Note type (model) configuration
    */
-  server.tool(
+  server.registerTool(
     'manage_models',
-    'List, create, and modify Anki note types, including fields, templates, and CSS styling. Use this for schema/template work, not for individual note content, decks, or review scheduling. All operations except `list` mutate the collection and can affect future rendering or compatibility of notes using that model. Pick `operation` first, then provide the model name plus the exact field, template, CSS, or creation inputs needed.',
     {
-      operation: z
-        .enum([
-          'list',
-          'create',
-          'add_field',
-          'remove_field',
-          'rename_field',
-          'add_template',
-          'remove_template',
-          'update_styling',
-        ])
-        .describe('Model management operation'),
+      title: 'Manage note types',
+      description: DESCRIPTIONS.manage_models,
+      annotations: DESTRUCTIVE_WRITE,
+      inputSchema: {
+        operation: z
+          .enum([
+            'list',
+            'create',
+            'add_field',
+            'remove_field',
+            'rename_field',
+            'add_template',
+            'remove_template',
+            'update_styling',
+          ])
+          .describe('Which operation to run; see the tool description for required parameters'),
 
-      modelName: z.string().optional().describe('Model/note type name'),
+        modelName: z
+          .string()
+          .optional()
+          .describe('Note type name (all operations except list), e.g. "Basic"'),
 
-      // For create
-      fields: z.array(z.string()).optional().describe('Field names in order (for create)'),
-      templates: z
-        .array(
-          z.object({
+        // For create
+        fields: z.array(z.string()).optional().describe('create: field names in order'),
+        templates: z
+          .array(
+            z.object({
+              Front: z.string(),
+              Back: z.string(),
+            })
+          )
+          .optional()
+          .describe(
+            'create: card templates, e.g. [{ Front: "{{Front}}", Back: "{{FrontSide}}<hr id=answer>{{Back}}" }]'
+          ),
+        css: z.string().optional().describe('create/update_styling: CSS for the card templates'),
+        isCloze: z.boolean().optional().describe('create: make a cloze deletion note type'),
+
+        // For field operations
+        fieldName: z
+          .string()
+          .optional()
+          .describe('add_field/remove_field/rename_field: field name (current name for rename)'),
+        newFieldName: z.string().optional().describe('rename_field: new field name'),
+        fieldIndex: z.number().optional().describe('add_field: 0-based position for the new field'),
+
+        // For template operations
+        templateName: z
+          .string()
+          .optional()
+          .describe('remove_template: template name, e.g. "Card 1"'),
+        template: z
+          .object({
             Front: z.string(),
             Back: z.string(),
           })
-        )
-        .optional()
-        .describe('Card templates (for create)'),
-      css: z.string().optional().describe('CSS styling'),
-      isCloze: z.boolean().optional().describe('Is cloze deletion type'),
-
-      // For field operations
-      fieldName: z.string().optional().describe('Field name'),
-      newFieldName: z.string().optional().describe('New field name (for rename)'),
-      fieldIndex: z.number().optional().describe('Field index position'),
-
-      // For template operations
-      templateName: z.string().optional().describe('Template name'),
-      template: z
-        .object({
-          Front: z.string(),
-          Back: z.string(),
-        })
-        .optional()
-        .describe('Template content'),
+          .optional()
+          .describe('add_template: template to add, { Front, Back } HTML'),
+      },
     },
     async ({
       operation,
@@ -824,18 +1052,29 @@ export function registerConsolidatedTools(server: McpServer) {
       templateName,
       template,
     }) => {
+      const isWrite = operation !== 'list';
       try {
         switch (operation) {
           case 'list': {
             const models = await ankiClient.model.modelNamesAndIds();
-            const modelList = Object.entries(models)
-              .map(([name, id]) => `  • ${name} (ID: ${id})`)
+            const details = await ankiClient.model.findModelsById({
+              modelIds: Object.values(models),
+            });
+            const modelList = details
+              .map((model) => {
+                const fieldNames = [...model.flds]
+                  .sort((a, b) => a.ord - b.ord)
+                  .map((f) => f.name)
+                  .join(', ');
+                const cloze = model.type === 1 ? ', cloze' : '';
+                return `  • ${model.name} (ID: ${model.id}${cloze}) fields: ${fieldNames}`;
+              })
               .join('\n');
             return {
               content: [
                 {
                   type: 'text',
-                  text: `Note Types (${Object.keys(models).length}):\n${modelList}`,
+                  text: `Note Types (${details.length}):\n${modelList}`,
                 },
               ],
             };
@@ -962,9 +1201,7 @@ export function registerConsolidatedTools(server: McpServer) {
             throw new Error(`Unknown operation: ${operation}`);
         }
       } catch (error) {
-        throw new Error(
-          `manage_models failed: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw await toolError('manage_models', error, isWrite);
       }
     }
   );
@@ -973,34 +1210,53 @@ export function registerConsolidatedTools(server: McpServer) {
    * TOOL 6: anki_operations
    * Utility operations: sync, media, export/import, version
    */
-  server.tool(
+  server.registerTool(
     'anki_operations',
-    'Run general Anki utility operations: sync, version lookup, package import/export, profile listing, and media storage or retrieval. Use this for cross-cutting maintenance tasks that do not belong to flashcard, deck, model, or study workflows. Import, export, sync, and media writes have external side effects; version and profile reads do not. Select `operation`, then provide the relevant deck name, file path, filename, media payload, URL, or pattern.',
     {
-      operation: z
-        .enum([
-          'sync',
-          'version',
-          'export_deck',
-          'import_package',
-          'store_media',
-          'retrieve_media',
-          'delete_media',
-          'list_media',
-          'get_profiles',
-        ])
-        .describe('Anki utility operation'),
+      title: 'Anki utilities: sync, packages, media',
+      description: DESCRIPTIONS.anki_operations,
+      annotations: DESTRUCTIVE_WRITE_OPEN_WORLD,
+      inputSchema: {
+        operation: z
+          .enum([
+            'sync',
+            'version',
+            'export_deck',
+            'import_package',
+            'store_media',
+            'retrieve_media',
+            'delete_media',
+            'list_media',
+            'get_profiles',
+          ])
+          .describe('Which operation to run; see the tool description for required parameters'),
 
-      // Export/import
-      deckName: z.string().optional().describe('Deck name to export'),
-      filePath: z.string().optional().describe('File path for export/import'),
-      includeSched: z.boolean().optional().describe('Include scheduling in export'),
+        // Export/import
+        deckName: z.string().optional().describe('export_deck: deck to export'),
+        filePath: z
+          .string()
+          .optional()
+          .describe('export_deck: .apkg path to write. import_package: .apkg path to read'),
+        includeSched: z
+          .boolean()
+          .optional()
+          .describe('export_deck: include review history and scheduling (default false)'),
 
-      // Media
-      filename: z.string().optional().describe('Media filename'),
-      mediaData: z.string().optional().describe('Base64 encoded media data'),
-      mediaUrl: z.string().optional().describe('URL to download media from'),
-      pattern: z.string().optional().describe('Pattern to match media files'),
+        // Media
+        filename: z
+          .string()
+          .optional()
+          .describe('store_media/retrieve_media/delete_media: media file name, e.g. "cat.png"'),
+        mediaData: z
+          .string()
+          .optional()
+          .describe('store_media: base64 file contents (or use mediaUrl)'),
+        mediaUrl: z
+          .string()
+          .optional()
+          .describe('store_media: URL Anki downloads the file from (or use mediaData)'),
+        pattern: z.string().optional().describe('list_media: glob pattern, e.g. "*.png" or "*"'),
+      },
     },
     async ({
       operation,
@@ -1012,6 +1268,9 @@ export function registerConsolidatedTools(server: McpServer) {
       mediaUrl,
       pattern,
     }) => {
+      const isWrite = !['version', 'retrieve_media', 'list_media', 'get_profiles'].includes(
+        operation
+      );
       try {
         switch (operation) {
           case 'sync': {
@@ -1163,9 +1422,7 @@ export function registerConsolidatedTools(server: McpServer) {
             throw new Error(`Unknown operation: ${operation}`);
         }
       } catch (error) {
-        throw new Error(
-          `anki_operations failed: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw await toolError('anki_operations', error, isWrite);
       }
     }
   );
@@ -1175,11 +1432,17 @@ export function registerConsolidatedTools(server: McpServer) {
    * Retrieve media files from Anki collection as base64-encoded data
    * This enables AI assistants to view and work with images/audio referenced in cards
    */
-  server.tool(
+  server.registerTool(
     'get_media_file',
-    'Retrieve one named Anki media file as base64 data and, for images, as MCP image content that compatible clients can inspect. Use this when an agent needs the actual contents of a referenced media asset, not when it only needs media names or storage operations; those belong in `anki_operations`. This tool is read-only and rejects path traversal. Pass a simple filename exactly as stored in Anki media.',
     {
-      filename: z.string().describe('Media filename referenced in Anki cards (e.g., "image.png")'),
+      title: 'Get media file contents',
+      description: DESCRIPTIONS.get_media_file,
+      annotations: READ_ONLY,
+      inputSchema: {
+        filename: z
+          .string()
+          .describe('Bare media file name as referenced in a card, e.g. "image.png" (no paths)'),
+      },
     },
     async ({ filename }) => {
       try {
