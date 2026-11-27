@@ -8,6 +8,14 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-27
+
+### Changed
+
+- First 1.x release; the code is the same as 0.7.0. The version skips 1.0.0 because the
+  Glama MCP directory already holds an auto-generated 1.0.0 release for this server,
+  which would otherwise rank above every 0.x release.
+
 ## [0.7.0] - 2026-11-27
 
 ### Added
@@ -117,7 +125,8 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 - Expanded server functionality and development tooling.
 
-[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/arielbk/anki-mcp/compare/v0.7.0...v1.1.0
 [0.7.0]: https://github.com/arielbk/anki-mcp/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/arielbk/anki-mcp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/arielbk/anki-mcp/compare/v0.4.2...v0.5.0
