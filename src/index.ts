@@ -13,6 +13,7 @@ import {
   registerNoteResources,
   registerStatisticResources,
 } from './resources/index.js';
+import { registerPrompts } from './prompts/index.js';
 import { registerConsolidatedTools, registerGraphicalTools } from './tools/index.js';
 
 function createServer(): McpServer {
@@ -33,6 +34,8 @@ function createServer(): McpServer {
 
   // Register graphical/GUI tools (issue #3)
   registerGraphicalTools(server);
+
+  registerPrompts(server);
 
   return server;
 }
