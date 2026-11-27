@@ -8,6 +8,8 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-27
+
 ### Added
 
 - Support for the stateless MCP 2026-07-28 revision (`server/discover`, per-request
@@ -115,7 +117,8 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 - Expanded server functionality and development tooling.
 
-[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/arielbk/anki-mcp/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/arielbk/anki-mcp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/arielbk/anki-mcp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/arielbk/anki-mcp/compare/v0.4.1...v0.4.2
