@@ -1,10 +1,10 @@
+import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
-import express from 'express';
 import { randomUUID } from 'node:crypto';
 import {
   registerCardResources,
@@ -13,12 +13,17 @@ import {
   registerNoteResources,
   registerStatisticResources,
 } from './resources/index.js';
+import { registerPrompts } from './prompts/index.js';
 import { registerConsolidatedTools, registerGraphicalTools } from './tools/index.js';
+
+// Injected from package.json by tsup (see tsup.config.ts) so it cannot drift.
+declare const __PACKAGE_VERSION__: string | undefined;
+const SERVER_VERSION = typeof __PACKAGE_VERSION__ === 'string' ? __PACKAGE_VERSION__ : '0.0.0-dev';
 
 function createServer(): McpServer {
   const server = new McpServer({
     name: 'Anki MCP Server',
-    version: '0.4.2',
+    version: SERVER_VERSION,
   });
 
   // Register resources (for context)
@@ -33,6 +38,8 @@ function createServer(): McpServer {
 
   // Register graphical/GUI tools (issue #3)
   registerGraphicalTools(server);
+
+  registerPrompts(server);
 
   return server;
 }
@@ -95,8 +102,12 @@ async function main() {
   const port = Number(getFlagValue('port') ?? process.env.PORT ?? 3000);
   const host = (getFlagValue('host') ?? process.env.HOST ?? '127.0.0.1') as string;
 
-  const app = express();
-  app.use(express.json());
+  // Validates the Host header (DNS rebinding protection) when bound to a loopback
+  // address; set ALLOWED_HOSTS (comma-separated) to restrict hosts on other binds.
+  const allowedHosts = process.env.ALLOWED_HOSTS?.split(',')
+    .map((h) => h.trim())
+    .filter(Boolean);
+  const app = createMcpExpressApp(allowedHosts?.length ? { host, allowedHosts } : { host });
 
   type Session = {
     transport: StreamableHTTPServerTransport;
@@ -117,9 +128,11 @@ async function main() {
     } else if (!sessionId && isInitializeRequest(req.body)) {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
-        // Recommend enabling DNS rebinding protection for local servers
-        // enableDnsRebindingProtection: true,
-        // allowedHosts: ['127.0.0.1', 'localhost'],
+        // The session ID only exists once the initialize request has been handled,
+        // so register the session from this callback rather than after connect().
+        onsessioninitialized: (id) => {
+          sessions[id] = { transport, server };
+        },
       });
 
       const server = createServer();
@@ -134,18 +147,7 @@ async function main() {
       // SDK getter types onclose as `(() => void) | undefined` while Transport interface
       // uses `onclose?: () => void`; these are incompatible under exactOptionalPropertyTypes.
       await server.connect(transport as unknown as Transport);
-
-      if (!transport.sessionId) {
-        res.status(500).json({
-          jsonrpc: '2.0',
-          error: { code: -32603, message: 'Failed to initialize session' },
-          id: null,
-        });
-        return;
-      }
-
-      sessions[transport.sessionId] = { transport, server };
-      session = sessions[transport.sessionId];
+      session = { transport, server };
     } else {
       res.status(400).json({
         jsonrpc: '2.0',
