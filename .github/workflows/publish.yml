@@ -1,0 +1,65 @@
+name: Publish
+
+# Publishes to npm (trusted publishing via OIDC, with provenance) and then to the
+# MCP registry when a GitHub release is published. Can also be run by hand for an
+# existing tag. No secrets needed: configure a trusted publisher for this repo and
+# workflow file on npmjs.com (package settings → Trusted publishing).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag to publish (e.g. v0.6.0)
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check versions match the tag
+        run: |
+          TAG="${{ github.event.inputs.ref || github.ref_name }}"
+          PKG="v$(node -p "require('./package.json').version")"
+          SRV="v$(node -p "require('./server.json').version")"
+          if [ "$TAG" != "$PKG" ] || [ "$TAG" != "$SRV" ]; then
+            echo "Tag $TAG, package.json $PKG, server.json $SRV must match" >&2
+            exit 1
+          fi
+
+      - run: pnpm typecheck && pnpm lint && pnpm test && pnpm build
+
+      - name: Publish to npm
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@arielbk/anki-mcp@$VERSION" version >/dev/null 2>&1; then
+            echo "@arielbk/anki-mcp@$VERSION is already on npm, skipping"
+          else
+            npm install -g npm@latest
+            npm publish --provenance --access public
+          fi
+
+      - name: Publish to the MCP registry
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
