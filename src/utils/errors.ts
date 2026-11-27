@@ -18,6 +18,18 @@ export class AnkiConnectionError extends Error {
   }
 }
 
+/**
+ * A problem with the caller's input (missing arguments, unreadable file,
+ * invalid notes) found before anything was sent to Anki. Reported as-is,
+ * without pinging AnkiConnect.
+ */
+export class InputError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'InputError';
+  }
+}
+
 const CONNECTION_ERROR_CODES = new Set([
   'ECONNREFUSED',
   'ECONNRESET',
@@ -104,7 +116,7 @@ export async function isAnkiReachable(client: Pingable): Promise<boolean> {
  * tell "Anki is down" apart from "Anki rejected the request".
  */
 export async function explainWriteFailure(client: Pingable, error: unknown): Promise<string> {
-  if (error instanceof AnkiConnectionError) return error.message;
+  if (error instanceof AnkiConnectionError || error instanceof InputError) return error.message;
   const reachable = await isAnkiReachable(client);
   if (!reachable) {
     return `${errorMessage(error)}. AnkiConnect is not responding any more, so Anki may have quit during this operation; some changes may have been applied. Restart Anki and check before retrying.`;

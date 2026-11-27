@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   findModelsByName: vi.fn(),
   findModelsById: vi.fn(),
   version: vi.fn(),
+  createDeck: vi.fn(),
+  getDeckConfig: vi.fn(),
+  deckNames: vi.fn(),
+  multi: vi.fn(),
 }));
 
 vi.mock('../src/utils/ankiClient.js', () => ({
@@ -30,7 +34,12 @@ vi.mock('../src/utils/ankiClient.js', () => ({
       findModelsByName: mocks.findModelsByName,
       findModelsById: mocks.findModelsById,
     },
-    miscellaneous: { version: mocks.version },
+    deck: {
+      createDeck: mocks.createDeck,
+      getDeckConfig: mocks.getDeckConfig,
+      deckNames: mocks.deckNames,
+    },
+    miscellaneous: { version: mocks.version, multi: mocks.multi },
   },
 }));
 
@@ -169,6 +178,40 @@ describe('MCP server', () => {
     });
     expect(textOf(result)).toMatch(/Dry run: 1 of 1/);
     expect(mocks.addNotes).not.toHaveBeenCalled();
+  });
+
+  it('reports argument and file errors without blaming Anki or pinging it', async () => {
+    const client = await connect();
+    const missing = await client.callTool({
+      name: 'manage_flashcards',
+      arguments: { operation: 'create', deckName: 'D' },
+    });
+    expect(missing.isError).toBe(true);
+    expect(textOf(missing)).toBe(
+      'manage_flashcards failed: create requires deckName, modelName, and fields'
+    );
+
+    const relative = await client.callTool({
+      name: 'manage_flashcards',
+      arguments: { operation: 'create_batch', filePath: 'cards.csv', deckName: 'D' },
+    });
+    expect(textOf(relative)).toMatch(/filePath must be absolute/);
+    expect(textOf(relative)).not.toMatch(/AnkiConnect|quit/);
+    expect(mocks.version).not.toHaveBeenCalled();
+  });
+
+  it('manage_decks create reports the deck even if setting limits fails', async () => {
+    mocks.createDeck.mockResolvedValue(1234);
+    mocks.getDeckConfig.mockRejectedValue(new Error('collection is not available'));
+    const client = await connect();
+    const result = await client.callTool({
+      name: 'manage_decks',
+      arguments: { operation: 'create', deckName: 'New', newPerDay: 10 },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toMatch(
+      /Created deck "New" \(ID: 1234\), but its limits were not set: AnkiConnect rejected the request: collection is not available/
+    );
   });
 
   it('manage_models list shows field names in order', async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   AnkiConnectionError,
+  InputError,
   explainWriteFailure,
   isConnectionError,
   wrapFetchWithConnectionErrors,
@@ -61,6 +62,14 @@ describe('explainWriteFailure', () => {
     const client = { miscellaneous: { version: vi.fn() } };
     expect(await explainWriteFailure(client, new AnkiConnectionError(URL))).toMatch(
       /Is Anki running/
+    );
+    expect(client.miscellaneous.version).not.toHaveBeenCalled();
+  });
+
+  it('reports input errors as-is without pinging', async () => {
+    const client = { miscellaneous: { version: vi.fn() } };
+    expect(await explainWriteFailure(client, new InputError('create requires deckName'))).toBe(
+      'create requires deckName'
     );
     expect(client.miscellaneous.version).not.toHaveBeenCalled();
   });

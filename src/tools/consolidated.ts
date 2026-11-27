@@ -9,7 +9,7 @@ import {
   type NoteInput,
 } from '../utils/batch.js';
 import { formatDeckLimits, setDeckLimits } from '../utils/deckLimits.js';
-import { errorMessage, explainWriteFailure } from '../utils/errors.js';
+import { InputError, errorMessage, explainWriteFailure } from '../utils/errors.js';
 import { readNotesFile, resolveFilePath } from '../utils/notesFile.js';
 import {
   DESCRIPTIONS,
@@ -203,7 +203,7 @@ export function registerConsolidatedTools(server: McpServer) {
         switch (operation) {
           case 'create': {
             if (!deckName || !modelName || !fields) {
-              throw new Error('create requires deckName, modelName, and fields');
+              throw new InputError('create requires deckName, modelName, and fields');
             }
             const options: { allowDuplicate?: boolean; duplicateScope?: string } = {};
             if (allowDuplicate !== undefined) options.allowDuplicate = allowDuplicate;
@@ -231,7 +231,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'create_batch': {
             if (notes && filePath) {
-              throw new Error('create_batch takes either notes or filePath, not both');
+              throw new InputError('create_batch takes either notes or filePath, not both');
             }
             let inputNotes: NoteInput[];
             let source: string | undefined;
@@ -247,10 +247,10 @@ export function registerConsolidatedTools(server: McpServer) {
                 return note;
               });
             } else {
-              throw new Error('create_batch requires notes or filePath');
+              throw new InputError('create_batch requires notes or filePath');
             }
             if (inputNotes.length === 0) {
-              throw new Error(`create_batch: no notes found${source ? ` in ${source}` : ''}`);
+              throw new InputError(`create_batch: no notes found${source ? ` in ${source}` : ''}`);
             }
 
             const resolved = resolveNotes(inputNotes, { deckName, modelName, tags });
@@ -284,10 +284,10 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'update': {
             if (!noteId) {
-              throw new Error('update requires noteId');
+              throw new InputError('update requires noteId');
             }
             if (!fields && !tags) {
-              throw new Error('update requires either fields or tags');
+              throw new InputError('update requires either fields or tags');
             }
             const updateData: any = { id: noteId };
             if (fields) updateData.fields = fields;
@@ -305,7 +305,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'delete': {
             if (!noteIds || noteIds.length === 0) {
-              throw new Error('delete requires noteIds array');
+              throw new InputError('delete requires noteIds array');
             }
             await ankiClient.note.deleteNotes({ notes: noteIds });
             return {
@@ -320,7 +320,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'find': {
             if (!query) {
-              throw new Error('find requires query parameter');
+              throw new InputError('find requires query parameter');
             }
             const foundNoteIds = await ankiClient.note.findNotes({ query });
             const totalResults = foundNoteIds.length;
@@ -355,7 +355,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'get_info': {
             if (!cardIds || cardIds.length === 0) {
-              throw new Error('get_info requires cardIds array');
+              throw new InputError('get_info requires cardIds array');
             }
 
             // Warn if requesting too many cards at once
@@ -383,7 +383,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'add_tags': {
             if (!noteIds || !tags) {
-              throw new Error('add_tags requires noteIds and tags');
+              throw new InputError('add_tags requires noteIds and tags');
             }
             await ankiClient.note.addTags({ notes: noteIds, tags: tags.join(' ') });
             return {
@@ -398,7 +398,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'remove_tags': {
             if (!noteIds || !tags) {
-              throw new Error('remove_tags requires noteIds and tags');
+              throw new InputError('remove_tags requires noteIds and tags');
             }
             await ankiClient.note.removeTags({ notes: noteIds, tags: tags.join(' ') });
             return {
@@ -424,7 +424,7 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           default:
-            throw new Error(`Unknown operation: ${operation}`);
+            throw new InputError(`Unknown operation: ${operation}`);
         }
       } catch (error) {
         throw await toolError('manage_flashcards', error, isWrite);
@@ -475,7 +475,7 @@ export function registerConsolidatedTools(server: McpServer) {
         switch (operation) {
           case 'find_due': {
             if (!query) {
-              throw new Error('find_due requires query parameter');
+              throw new InputError('find_due requires query parameter');
             }
             const foundCardIds = await ankiClient.card.findCards({ query });
 
@@ -504,7 +504,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'answer': {
             if (!answers || answers.length === 0) {
-              throw new Error('answer requires answers array');
+              throw new InputError('answer requires answers array');
             }
             const results = await ankiClient.card.answerCards({ answers });
             const successCount = results.filter(Boolean).length;
@@ -520,7 +520,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'suspend': {
             if (!cardIds || cardIds.length === 0) {
-              throw new Error('suspend requires cardIds');
+              throw new InputError('suspend requires cardIds');
             }
             await ankiClient.card.suspend({ cards: cardIds });
             return {
@@ -535,7 +535,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'unsuspend': {
             if (!cardIds || cardIds.length === 0) {
-              throw new Error('unsuspend requires cardIds');
+              throw new InputError('unsuspend requires cardIds');
             }
             await ankiClient.card.unsuspend({ cards: cardIds });
             return {
@@ -550,7 +550,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'check_status': {
             if (!cardIds || cardIds.length === 0) {
-              throw new Error('check_status requires cardIds');
+              throw new InputError('check_status requires cardIds');
             }
             const [dueStatus, suspendedStatus] = await Promise.all([
               ankiClient.card.areDue({ cards: cardIds }),
@@ -575,7 +575,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'forget': {
             if (!cardIds || cardIds.length === 0) {
-              throw new Error('forget requires cardIds');
+              throw new InputError('forget requires cardIds');
             }
             await ankiClient.card.forgetCards({ cards: cardIds });
             return {
@@ -590,7 +590,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'relearn': {
             if (!cardIds || cardIds.length === 0) {
-              throw new Error('relearn requires cardIds');
+              throw new InputError('relearn requires cardIds');
             }
             await ankiClient.card.relearnCards({ cards: cardIds });
             return {
@@ -604,7 +604,7 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           default:
-            throw new Error(`Unknown operation: ${operation}`);
+            throw new InputError(`Unknown operation: ${operation}`);
         }
       } catch (error) {
         throw await toolError('study_session', error, isWrite);
@@ -694,26 +694,39 @@ export function registerConsolidatedTools(server: McpServer) {
         switch (operation) {
           case 'create': {
             if (!deckName) {
-              throw new Error('create requires deckName');
+              throw new InputError('create requires deckName');
             }
             const result = await ankiClient.deck.createDeck({ deck: deckName });
             let text = `✓ Created deck "${deckName}" (ID: ${String(result)})`;
             if (newPerDay !== undefined || reviewsPerDay !== undefined) {
-              const limits = await setDeckLimits(ankiClient, deckName, {
-                newPerDay,
-                reviewsPerDay,
-              });
-              text += `\n${formatDeckLimits(deckName, limits)}`;
+              try {
+                const limits = await setDeckLimits(ankiClient, deckName, {
+                  newPerDay,
+                  reviewsPerDay,
+                });
+                text += `\n${formatDeckLimits(deckName, limits)}`;
+              } catch (limitsError) {
+                const reason = await explainWriteFailure(ankiClient, limitsError);
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `${text}, but its limits were not set: ${reason}\nRetry with manage_decks set_limits.`,
+                    },
+                  ],
+                  isError: true,
+                };
+              }
             }
             return { content: [{ type: 'text', text }] };
           }
 
           case 'set_limits': {
             if (!deckName) {
-              throw new Error('set_limits requires deckName');
+              throw new InputError('set_limits requires deckName');
             }
             if (newPerDay === undefined && reviewsPerDay === undefined) {
-              throw new Error('set_limits requires newPerDay and/or reviewsPerDay');
+              throw new InputError('set_limits requires newPerDay and/or reviewsPerDay');
             }
             const limits = await setDeckLimits(ankiClient, deckName, { newPerDay, reviewsPerDay });
             return { content: [{ type: 'text', text: formatDeckLimits(deckName, limits) }] };
@@ -721,10 +734,10 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'delete': {
             if (!deckNames || deckNames.length === 0) {
-              throw new Error('delete requires deckNames');
+              throw new InputError('delete requires deckNames');
             }
             if (deleteCards === false) {
-              throw new Error(
+              throw new InputError(
                 'AnkiConnect can only delete a deck together with its cards. Move the cards elsewhere first with move_cards, then delete.'
               );
             }
@@ -759,7 +772,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'get_stats': {
             if (!deckName) {
-              throw new Error('get_stats requires deckName');
+              throw new InputError('get_stats requires deckName');
             }
             const stats = await ankiClient.deck.getDeckStats({ decks: [deckName] });
             return {
@@ -774,7 +787,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'move_cards': {
             if (!cardIds || !targetDeck) {
-              throw new Error('move_cards requires cardIds and targetDeck');
+              throw new InputError('move_cards requires cardIds and targetDeck');
             }
             await ankiClient.deck.changeDeck({ cards: cardIds, deck: targetDeck });
             return {
@@ -789,7 +802,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'get_config': {
             if (!deckName) {
-              throw new Error('get_config requires deckName');
+              throw new InputError('get_config requires deckName');
             }
             const config = await ankiClient.deck.getDeckConfig({ deck: deckName });
             return {
@@ -804,7 +817,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'set_config': {
             if (!deckNames || !configId) {
-              throw new Error('set_config requires deckNames and configId');
+              throw new InputError('set_config requires deckNames and configId');
             }
             await ankiClient.deck.setDeckConfigId({ configId, decks: deckNames });
             return {
@@ -818,7 +831,7 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           default:
-            throw new Error(`Unknown operation: ${operation}`);
+            throw new InputError(`Unknown operation: ${operation}`);
         }
       } catch (error) {
         throw await toolError('manage_decks', error, isWrite);
@@ -869,7 +882,7 @@ export function registerConsolidatedTools(server: McpServer) {
         switch (scope) {
           case 'deck_stats': {
             if (!deckName) {
-              throw new Error('deck_stats requires deckName');
+              throw new InputError('deck_stats requires deckName');
             }
             const stats = await ankiClient.deck.getDeckStats({ decks: [deckName] });
             return {
@@ -922,7 +935,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'card_reviews': {
             if (!deckName || startTimestamp === undefined) {
-              throw new Error('card_reviews requires deckName and startTimestamp');
+              throw new InputError('card_reviews requires deckName and startTimestamp');
             }
             const reviews = await ankiClient.statistic.cardReviews({
               deck: deckName,
@@ -940,7 +953,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'card_details': {
             if (!cardIds || cardIds.length === 0) {
-              throw new Error('card_details requires cardIds');
+              throw new InputError('card_details requires cardIds');
             }
             const [easeFactors, intervals] = await Promise.all([
               ankiClient.card.getEaseFactors({ cards: cardIds }),
@@ -964,7 +977,7 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           default:
-            throw new Error(`Unknown scope: ${scope}`);
+            throw new InputError(`Unknown scope: ${scope}`);
         }
       } catch (error) {
         throw await toolError('get_analytics', error, false);
@@ -1082,7 +1095,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'create': {
             if (!modelName || !fields || !templates) {
-              throw new Error('create requires modelName, fields, and templates');
+              throw new InputError('create requires modelName, fields, and templates');
             }
             const modelParams: any = {
               modelName,
@@ -1105,7 +1118,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'add_field': {
             if (!modelName || !fieldName || fieldIndex === undefined) {
-              throw new Error('add_field requires modelName, fieldName, and fieldIndex');
+              throw new InputError('add_field requires modelName, fieldName, and fieldIndex');
             }
             await ankiClient.model.modelFieldAdd({ modelName, fieldName, index: fieldIndex });
             return {
@@ -1120,7 +1133,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'remove_field': {
             if (!modelName || !fieldName) {
-              throw new Error('remove_field requires modelName and fieldName');
+              throw new InputError('remove_field requires modelName and fieldName');
             }
             await ankiClient.model.modelFieldRemove({ modelName, fieldName });
             return {
@@ -1135,7 +1148,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'rename_field': {
             if (!modelName || !fieldName || !newFieldName) {
-              throw new Error('rename_field requires modelName, fieldName, and newFieldName');
+              throw new InputError('rename_field requires modelName, fieldName, and newFieldName');
             }
             await ankiClient.model.modelFieldRename({
               modelName,
@@ -1154,7 +1167,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'add_template': {
             if (!modelName || !template) {
-              throw new Error('add_template requires modelName and template');
+              throw new InputError('add_template requires modelName and template');
             }
             await ankiClient.model.modelTemplateAdd({ modelName, template });
             return {
@@ -1169,7 +1182,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'remove_template': {
             if (!modelName || !templateName) {
-              throw new Error('remove_template requires modelName and templateName');
+              throw new InputError('remove_template requires modelName and templateName');
             }
             await ankiClient.model.modelTemplateRemove({ modelName, templateName });
             return {
@@ -1184,7 +1197,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'update_styling': {
             if (!modelName || !css) {
-              throw new Error('update_styling requires modelName and css');
+              throw new InputError('update_styling requires modelName and css');
             }
             await ankiClient.model.updateModelStyling({ model: { name: modelName, css } });
             return {
@@ -1198,7 +1211,7 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           default:
-            throw new Error(`Unknown operation: ${operation}`);
+            throw new InputError(`Unknown operation: ${operation}`);
         }
       } catch (error) {
         throw await toolError('manage_models', error, isWrite);
@@ -1299,7 +1312,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'export_deck': {
             if (!deckName || !filePath) {
-              throw new Error('export_deck requires deckName and filePath');
+              throw new InputError('export_deck requires deckName and filePath');
             }
             const params: any = { deck: deckName, path: filePath };
             if (includeSched !== undefined) params.includeSched = includeSched;
@@ -1316,7 +1329,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'import_package': {
             if (!filePath) {
-              throw new Error('import_package requires filePath');
+              throw new InputError('import_package requires filePath');
             }
             await ankiClient.miscellaneous.importPackage({ path: filePath });
             return {
@@ -1331,10 +1344,10 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'store_media': {
             if (!filename) {
-              throw new Error('store_media requires filename');
+              throw new InputError('store_media requires filename');
             }
             if (!mediaData && !mediaUrl) {
-              throw new Error('store_media requires either mediaData or mediaUrl');
+              throw new InputError('store_media requires either mediaData or mediaUrl');
             }
             const params: any = { filename };
             if (mediaData) params.data = mediaData;
@@ -1353,7 +1366,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'retrieve_media': {
             if (!filename) {
-              throw new Error('retrieve_media requires filename');
+              throw new InputError('retrieve_media requires filename');
             }
             const content = await ankiClient.media.retrieveMediaFile({ filename });
             if (content === false) {
@@ -1378,7 +1391,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'delete_media': {
             if (!filename) {
-              throw new Error('delete_media requires filename');
+              throw new InputError('delete_media requires filename');
             }
             await ankiClient.media.deleteMediaFile({ filename });
             return {
@@ -1393,7 +1406,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'list_media': {
             if (!pattern) {
-              throw new Error('list_media requires pattern (e.g., "*.jpg", "*")');
+              throw new InputError('list_media requires pattern (e.g., "*.jpg", "*")');
             }
             const files = await ankiClient.media.getMediaFilesNames({ pattern });
             return {
@@ -1419,7 +1432,7 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           default:
-            throw new Error(`Unknown operation: ${operation}`);
+            throw new InputError(`Unknown operation: ${operation}`);
         }
       } catch (error) {
         throw await toolError('anki_operations', error, isWrite);
@@ -1453,7 +1466,9 @@ export function registerConsolidatedTools(server: McpServer) {
           filename.includes('/') ||
           filename.includes('\\')
         ) {
-          throw new Error('Invalid filename: must be a simple filename without path traversal');
+          throw new InputError(
+            'Invalid filename: must be a simple filename without path traversal'
+          );
         }
 
         // Retrieve the media file from AnkiConnect
