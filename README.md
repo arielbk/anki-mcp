@@ -212,24 +212,31 @@ Claude: I'll help you organize those cards...
 The server provides **7 intuitive tools** that cover everything you need:
 
 ### 📝 **Manage Flashcards**
+
 Create, update, delete, and search your flashcards. Perfect for content creation, bulk updates, and organization.
 
 ### 🎯 **Study Sessions**
+
 Run interactive quiz sessions, manage card scheduling, and track which cards need review.
 
 ### 📚 **Manage Decks**
+
 Create and organize decks, move cards around, and configure deck settings.
 
 ### 📊 **Get Analytics**
+
 Dive into your study statistics, review history, and learning patterns.
 
 ### 🎨 **Manage Models**
+
 Customize note types, add fields, modify templates, and style your cards.
 
 ### 🔧 **Anki Operations**
+
 Handle sync, media files, imports/exports, and other utility operations.
 
 ### 🖼️ **Get Media File**
+
 Retrieve media files (images, audio, etc.) from your Anki collection. AI assistants can analyze images directly (though they won't display in the UI).
 
 > **💡 Pro Tip:** Many operations support pagination to prevent overwhelming your context window. Use `limit` and `offset` parameters when working with large result sets.
