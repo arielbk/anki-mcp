@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/). When releasing, bump the version in
 both `package.json` and `server.json` (CI checks that they match).
 
-## [Unreleased]
+## [0.6.0] - 2026-11-27
 
 ### Changed
 
@@ -21,16 +21,37 @@ both `package.json` and `server.json` (CI checks that they match).
 
 ### Fixed
 
+- Large `create_batch` calls could crash Anki and lose the whole batch. Notes are now sent
+  in chunks (`chunkSize`, default 10), and a failure partway reports which notes were saved,
+  which are unknown and which to resend.
+- "fetch failed" is replaced by "Couldn't reach AnkiConnect at <url>. Is Anki running?";
+  after a failed write the server checks whether Anki is down or rejected the request.
+- `ANKI_CONNECT_HOST` / `ANKI_CONNECT_PORT` are now honoured.
+- `manage_decks delete` with `deleteCards: false` now fails clearly (AnkiConnect always
+  deletes the cards).
 - HTTP mode rejected every `initialize` request with "Failed to initialize session".
 
 ### Added
 
+- `create_batch`: per-note results with the reason each failed note was rejected
+  (duplicate, unknown field, empty first field, ...), top-level `deckName`/`modelName`/`tags`
+  defaults, `allowDuplicate`/`duplicateScope`, `dryRun`, and duplicate detection within the batch.
+  Field names match case-insensitively.
+- Import notes from a file: `create_batch` with an absolute `filePath` to JSON, CSV, TSV or an
+  Anki `.txt` export.
+- Per-deck daily limits: `manage_decks set_limits` and `newPerDay`/`reviewsPerDay` on `create`.
+  A preset shared with other decks is cloned first, so other decks are unchanged.
+- `writing_good_flashcards` MCP prompt.
+- `manage_models list` shows each note type's field names.
+- All tools have titles and annotations (read-only, destructive, idempotent, open-world).
+- Unit and integration tests (vitest).
 - GitHub Actions CI (typecheck, lint, format, build, stdio smoke test) on Node 20/22/24.
 - `Dockerfile` for container builds and MCP directory introspection.
 
 ### Removed
 
 - Unused legacy per-endpoint tool modules (they were no longer registered).
+- The unused `days` parameter of `study_session`.
 
 ## [0.5.0] - 2026-05-23
 
@@ -67,7 +88,8 @@ both `package.json` and `server.json` (CI checks that they match).
 
 - Expanded server functionality and development tooling.
 
-[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/arielbk/anki-mcp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/arielbk/anki-mcp/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/arielbk/anki-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/arielbk/anki-mcp/compare/v0.4.0...v0.4.1
