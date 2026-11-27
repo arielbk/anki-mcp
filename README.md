@@ -183,7 +183,11 @@ node dist/index.js --http --host=127.0.0.1 --port=3000
 
 Clients that support Streamable HTTP can connect directly. Legacy SSE clients may still work via client-side fallback.
 
-When bound to a loopback address (the default), the HTTP server rejects requests whose `Host` header is not `localhost`, `127.0.0.1` or `[::1]` (DNS rebinding protection). If you bind to another interface, set `ALLOWED_HOSTS` to a comma-separated list of hostnames to keep that check.
+HTTP mode is **stateless**: every `POST /mcp` is answered by a fresh server instance, no `Mcp-Session-Id` is issued, and `GET`/`DELETE /mcp` (2025 session operations) return `405 Method Not Allowed`.
+
+**Protocol versions.** Both transports serve the stateless [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) revision (`server/discover` plus the per-request `_meta` envelope) and the 2025-era revisions via the `initialize` handshake (2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05), so existing clients keep working unchanged.
+
+When bound to a loopback address (the default), the HTTP server rejects requests whose `Host` header is not `localhost`, `127.0.0.1` or `[::1]`, and requests carrying a browser `Origin` header from another host (DNS rebinding protection). Clients that send no `Origin` header, such as desktop and CLI MCP clients, are unaffected. If you bind to another interface, set `ALLOWED_HOSTS` to a comma-separated list of hostnames to keep the `Host` check.
 
 ### Option 4: Container
 
