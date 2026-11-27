@@ -66,18 +66,31 @@ jobs:
             }
           "
 
-      - name: Smoke test (stdio tools/list)
+      - name: Smoke test (stdio tools/list, 2025 and 2026-07-28 clients)
+        # stdin stays open briefly: the server exits on EOF and drops requests still in flight.
         run: |
-          printf '%s\n' \
-            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
-            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-            | timeout 15 node dist/index.js > out.jsonl || true
+          { printf '%s\n' \
+              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+              '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'; sleep 2; } \
+            | timeout 15 node dist/index.js > legacy.jsonl || true
+          META='"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"ci","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}'
+          { printf '%s\n' \
+              '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{'"$META"'}}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{'"$META"'}}'; sleep 2; } \
+            | timeout 15 node dist/index.js > modern.jsonl || true
           node -e "
-            const lines = require('fs').readFileSync('out.jsonl', 'utf8').trim().split('\n').map(JSON.parse);
-            const tools = lines.find((m) => m.id === 2)?.result?.tools ?? [];
-            if (!tools.length) { console.error('no tools listed'); process.exit(1); }
-            const missing = tools.filter((t) => !t.description).map((t) => t.name);
-            if (missing.length) { console.error('tools without descriptions: ' + missing); process.exit(1); }
-            console.log('listed ' + tools.length + ' tools: ' + tools.map((t) => t.name).join(', '));
+            const fs = require('fs');
+            const read = (f) => fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+            for (const file of ['legacy.jsonl', 'modern.jsonl']) {
+              const tools = read(file).find((m) => m.id === 2)?.result?.tools ?? [];
+              if (!tools.length) { console.error(file + ': no tools listed'); process.exit(1); }
+              const missing = tools.filter((t) => !t.description).map((t) => t.name);
+              if (missing.length) { console.error(file + ': tools without descriptions: ' + missing); process.exit(1); }
+              console.log(file + ': listed ' + tools.length + ' tools: ' + tools.map((t) => t.name).join(', '));
+            }
+            const discover = read('modern.jsonl').find((m) => m.id === 1)?.result;
+            if (!discover?.supportedVersions?.includes('2026-07-28')) {
+              console.error('server/discover did not offer 2026-07-28'); process.exit(1);
+            }
           "
