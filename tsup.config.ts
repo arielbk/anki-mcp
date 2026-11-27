@@ -23,7 +23,7 @@ export default defineConfig({
   banner: {
     js: '#!/usr/bin/env node',
   },
-  external: ['@modelcontextprotocol/sdk', 'yanki-connect', 'zod', 'express'],
+  external: [/^@modelcontextprotocol\//, 'yanki-connect', 'zod', 'express'],
   noExternal: [],
   esbuildOptions: (options) => {
     options.banner = {

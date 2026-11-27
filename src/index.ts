@@ -1,98 +1,44 @@
-import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import type { Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
-import {
-  registerCardResources,
-  registerDeckResources,
-  registerModelResources,
-  registerNoteResources,
-  registerStatisticResources,
-} from './resources/index.js';
-import { registerPrompts } from './prompts/index.js';
-import { registerConsolidatedTools, registerGraphicalTools } from './tools/index.js';
+import { serveStdio, type StdioServerHandle } from '@modelcontextprotocol/server/stdio';
+import type { Server } from 'node:http';
+import { createHttpApp } from './http.js';
+import { createServer } from './server.js';
 
-// Injected from package.json by tsup (see tsup.config.ts) so it cannot drift.
-declare const __PACKAGE_VERSION__: string | undefined;
-const SERVER_VERSION = typeof __PACKAGE_VERSION__ === 'string' ? __PACKAGE_VERSION__ : '0.0.0-dev';
+let stdioHandle: StdioServerHandle | undefined;
+let httpServer: Server | undefined;
+let closeHttpHandler: (() => Promise<void>) | undefined;
 
-function createServer(): McpServer {
-  const server = new McpServer({
-    name: 'Anki MCP Server',
-    version: SERVER_VERSION,
-  });
-
-  // Register resources (for context)
-  registerDeckResources(server);
-  registerCardResources(server);
-  registerNoteResources(server);
-  registerModelResources(server);
-  registerStatisticResources(server);
-
-  // Register consolidated tools (6 high-level tools following MCP best practices)
-  registerConsolidatedTools(server);
-
-  // Register graphical/GUI tools (issue #3)
-  registerGraphicalTools(server);
-
-  registerPrompts(server);
-
-  return server;
+function shutdown(signal: string) {
+  // stderr only: stdout carries the stdio protocol.
+  console.error(`\nReceived ${signal}. Shutting down gracefully...`);
+  void (async () => {
+    try {
+      await stdioHandle?.close();
+    } catch {}
+    try {
+      await closeHttpHandler?.();
+    } catch {}
+    try {
+      httpServer?.close();
+    } catch {}
+    process.exit(0);
+  })();
 }
 
-// Handle graceful shutdown
-let stdioServer: McpServer | undefined;
-let httpServer: import('http').Server | undefined;
-
-process.on('SIGINT', () => {
-  console.log('\nReceived SIGINT. Shutting down gracefully...');
-  void (async () => {
-    try {
-      if (stdioServer) await stdioServer.close();
-    } catch {}
-    try {
-      if (httpServer) httpServer.close();
-    } catch {}
-    process.exit(0);
-  })();
-});
-
-process.on('SIGTERM', () => {
-  console.log('\nReceived SIGTERM. Shutting down gracefully...');
-  void (async () => {
-    try {
-      if (stdioServer) await stdioServer.close();
-    } catch {}
-    try {
-      if (httpServer) httpServer.close();
-    } catch {}
-    process.exit(0);
-  })();
-});
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Start server in either stdio (default) or HTTP mode
-async function main() {
+function main() {
   const args = process.argv.slice(2);
-  const isHttp = args.includes('--http');
-  if (!isHttp) {
-    try {
-      const server = createServer();
-      stdioServer = server;
-      const transport = new StdioServerTransport();
-      await server.connect(transport);
-      console.error('Anki MCP Server (stdio) started successfully');
-    } catch (error) {
-      console.error('Failed to start Anki MCP Server (stdio):', error);
-      process.exit(1);
-    }
+  if (!args.includes('--http')) {
+    // Serves both 2025-era clients (initialize handshake) and 2026-07-28 clients.
+    stdioHandle = serveStdio(createServer, {
+      onerror: (error) => console.error('MCP stdio error:', error),
+    });
+    console.error('Anki MCP Server (stdio) started successfully');
     return;
   }
 
-  // HTTP mode (Streamable HTTP transport)
   const getFlagValue = (name: string): string | undefined => {
     const match = args.find((a) => a.startsWith(`--${name}=`));
     if (!match) return undefined;
@@ -100,95 +46,24 @@ async function main() {
     return value ?? undefined;
   };
   const port = Number(getFlagValue('port') ?? process.env.PORT ?? 3000);
-  const host = (getFlagValue('host') ?? process.env.HOST ?? '127.0.0.1') as string;
+  const host = getFlagValue('host') ?? process.env.HOST ?? '127.0.0.1';
 
-  // Validates the Host header (DNS rebinding protection) when bound to a loopback
-  // address; set ALLOWED_HOSTS (comma-separated) to restrict hosts on other binds.
+  // Host header validation (DNS rebinding protection) is automatic on loopback binds;
+  // set ALLOWED_HOSTS (comma-separated) to restrict hosts on other binds.
   const allowedHosts = process.env.ALLOWED_HOSTS?.split(',')
     .map((h) => h.trim())
     .filter(Boolean);
-  const app = createMcpExpressApp(allowedHosts?.length ? { host, allowedHosts } : { host });
-
-  type Session = {
-    transport: StreamableHTTPServerTransport;
-    server: McpServer;
-  };
-
-  const sessions: Record<string, Session> = {};
-
-  app.post('/mcp', async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    let session: Session | undefined;
-
-    if (typeof sessionId === 'string') {
-      const existing = sessions[sessionId];
-      if (existing) {
-        session = existing;
-      }
-    } else if (isInitializeRequest(req.body)) {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        // The session ID only exists once the initialize request has been handled,
-        // so register the session from this callback rather than after connect().
-        onsessioninitialized: (id) => {
-          sessions[id] = { transport, server };
-        },
-      });
-
-      const server = createServer();
-
-      transport.onclose = () => {
-        if (transport.sessionId && sessions[transport.sessionId]) {
-          delete sessions[transport.sessionId];
-        }
-        server.close().catch(() => {});
-      };
-
-      // SDK getter types onclose as `(() => void) | undefined` while Transport interface
-      // uses `onclose?: () => void`; these are incompatible under exactOptionalPropertyTypes.
-      await server.connect(transport as unknown as Transport);
-      session = { transport, server };
-    } else {
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: { code: -32000, message: 'Bad Request: No valid session ID provided' },
-        id: null,
-      });
-      return;
-    }
-
-    if (!session) {
-      // Should be unreachable due to prior guards
-      res.status(500).json({
-        jsonrpc: '2.0',
-        error: { code: -32603, message: 'Session unavailable' },
-        id: null,
-      });
-      return;
-    }
-    await session.transport.handleRequest(req, res, req.body);
-  });
-
-  const handleSessionRequest = async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (typeof sessionId !== 'string' || !sessions[sessionId]) {
-      res.status(400).send('Invalid or missing session ID');
-      return;
-    }
-    const session = sessions[sessionId];
-    await session.transport.handleRequest(req, res);
-  };
-
-  // Notifications via SSE and session termination
-  app.get('/mcp', handleSessionRequest);
-  app.delete('/mcp', handleSessionRequest);
+  const { app, handler } = createHttpApp({ host, allowedHosts });
+  closeHttpHandler = handler.close;
 
   httpServer = app.listen(port, host, () => {
     console.error(`Anki MCP Server (http) listening on http://${host}:${port}/mcp`);
   });
 }
 
-main().catch((error) => {
-  console.error('Unhandled error:', error);
+try {
+  main();
+} catch (error) {
+  console.error('Failed to start Anki MCP Server:', error);
   process.exit(1);
-});
+}

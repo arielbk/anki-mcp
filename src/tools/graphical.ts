@@ -1,5 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServer, CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { ankiClient } from '../utils/ankiClient.js';
 
@@ -72,7 +71,7 @@ export function registerGraphicalTools(server: McpServer) {
     {
       title: 'Control the Anki app UI',
       description: DESCRIPTION,
-      inputSchema: {
+      inputSchema: z.object({
         operation: z
           .enum(GUI_OPERATIONS)
           .describe('The GUI action to perform. See the tool description for what each one does.'),
@@ -127,7 +126,7 @@ export function registerGraphicalTools(server: McpServer) {
           .describe(
             'Absolute path of the file to import (.apkg, .colpkg, .txt, .csv, ...). Required for import_file.'
           ),
-      },
+      }),
       annotations: {
         title: 'Control the Anki app UI',
         readOnlyHint: false,
