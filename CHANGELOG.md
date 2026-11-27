@@ -3,7 +3,16 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/). When releasing, bump the version in
-both `package.json` and `server.json` (CI checks that they match).
+both `package.json` and `server.json` (CI checks that they match), then publish a GitHub
+release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP registry.
+
+## [Unreleased]
+
+### Changed
+
+- Lint warnings fixed; ESLint and Vitest ignore local worktrees.
+- The Publish workflow waits for a new version to appear on npm before registering it
+  with the MCP registry.
 
 ## [0.6.0] - 2026-11-27
 

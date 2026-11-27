@@ -289,9 +289,9 @@ export function registerConsolidatedTools(server: McpServer) {
             if (!fields && !tags) {
               throw new InputError('update requires either fields or tags');
             }
-            const updateData: any = { id: noteId };
-            if (fields) updateData.fields = fields;
-            if (tags) updateData.tags = tags;
+            const updateData: Parameters<typeof ankiClient.note.updateNote>[0]['note'] = fields
+              ? { id: noteId, fields, ...(tags ? { tags } : {}) }
+              : { id: noteId, tags: tags ?? [] };
             await ankiClient.note.updateNote({ note: updateData });
             return {
               content: [
@@ -1097,7 +1097,7 @@ export function registerConsolidatedTools(server: McpServer) {
             if (!modelName || !fields || !templates) {
               throw new InputError('create requires modelName, fields, and templates');
             }
-            const modelParams: any = {
+            const modelParams: Parameters<typeof ankiClient.model.createModel>[0] = {
               modelName,
               inOrderFields: fields,
               cardTemplates: templates,
@@ -1314,7 +1314,10 @@ export function registerConsolidatedTools(server: McpServer) {
             if (!deckName || !filePath) {
               throw new InputError('export_deck requires deckName and filePath');
             }
-            const params: any = { deck: deckName, path: filePath };
+            const params: Parameters<typeof ankiClient.miscellaneous.exportPackage>[0] = {
+              deck: deckName,
+              path: filePath,
+            };
             if (includeSched !== undefined) params.includeSched = includeSched;
             await ankiClient.miscellaneous.exportPackage(params);
             return {
@@ -1349,7 +1352,7 @@ export function registerConsolidatedTools(server: McpServer) {
             if (!mediaData && !mediaUrl) {
               throw new InputError('store_media requires either mediaData or mediaUrl');
             }
-            const params: any = { filename };
+            const params: Parameters<typeof ankiClient.media.storeMediaFile>[0] = { filename };
             if (mediaData) params.data = mediaData;
             if (mediaUrl) params.url = mediaUrl;
 
@@ -1489,8 +1492,8 @@ export function registerConsolidatedTools(server: McpServer) {
         }
 
         // Detect MIME type from file extension
-        const extension = filename.split('.').pop()?.toLowerCase() || '';
-        const mimeType = MIME_TYPES[extension] || 'application/octet-stream';
+        const extension = filename.split('.').pop()?.toLowerCase() ?? '';
+        const mimeType = MIME_TYPES[extension] ?? 'application/octet-stream';
 
         // Calculate size (approximate from base64 length)
         const size = Math.floor((base64Content.length * 3) / 4);

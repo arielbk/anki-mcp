@@ -125,7 +125,7 @@ async function main() {
       if (existing) {
         session = existing;
       }
-    } else if (!sessionId && isInitializeRequest(req.body)) {
+    } else if (isInitializeRequest(req.body)) {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         // The session ID only exists once the initialize request has been handled,

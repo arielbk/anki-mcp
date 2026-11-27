@@ -5,7 +5,14 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', '**/*.d.ts'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      '**/*.d.ts',
+      '.claude/**',
+      '.worktrees/**',
+      '.pnpm-store/**',
+    ],
   },
   {
     files: ['**/*.config.js', '**/*.config.ts'],
