@@ -35,7 +35,7 @@ export function registerCardResources(server: McpServer) {
     },
     async (uri) => {
       try {
-        const query = decodeURIComponent(uri.pathname.split('/').pop() || '');
+        const query = decodeURIComponent(uri.pathname.split('/').pop() ?? '');
         if (!query) {
           throw new Error('Query parameter is required');
         }

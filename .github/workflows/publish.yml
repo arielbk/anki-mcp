@@ -58,6 +58,16 @@ jobs:
             npm publish --provenance --access public
           fi
 
+      - name: Wait for the version to appear on npm
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          for i in $(seq 1 40); do
+            if npm view "@arielbk/anki-mcp@$VERSION" version >/dev/null 2>&1; then exit 0; fi
+            sleep 15
+          done
+          echo "@arielbk/anki-mcp@$VERSION not visible on npm after 10 minutes" >&2
+          exit 1
+
       - name: Publish to the MCP registry
         run: |
           curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher

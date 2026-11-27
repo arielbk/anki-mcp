@@ -114,7 +114,7 @@ export function registerNoteResources(server: McpServer) {
     },
     async (uri) => {
       try {
-        const query = decodeURIComponent(uri.pathname.split('/').pop() || '');
+        const query = decodeURIComponent(uri.pathname.split('/').pop() ?? '');
         if (!query) {
           throw new Error('Search query is required');
         }
@@ -165,7 +165,7 @@ export function registerNoteResources(server: McpServer) {
     },
     async (uri) => {
       try {
-        const tag = decodeURIComponent(uri.pathname.split('/').pop() || '');
+        const tag = decodeURIComponent(uri.pathname.split('/').pop() ?? '');
         if (!tag) {
           throw new Error('Tag is required');
         }
@@ -217,7 +217,7 @@ export function registerNoteResources(server: McpServer) {
     },
     async (uri) => {
       try {
-        const daysParam = uri.pathname.split('/').pop() || '7';
+        const daysParam = (uri.pathname.split('/').pop() ?? '') || '7';
         const days = parseInt(daysParam, 10);
 
         if (isNaN(days) || days <= 0) {

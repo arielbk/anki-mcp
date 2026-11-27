@@ -17,7 +17,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/arielbk/anki-mcp"
+    "url": "git+https://github.com/arielbk/anki-mcp.git"
   },
   "homepage": "https://github.com/arielbk/anki-mcp#readme",
   "bugs": {
@@ -44,7 +44,7 @@
     "start:http": "node dist/index.js --http",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
     "inspect:http": "npx @modelcontextprotocol/inspector --transport http --server-url http://127.0.0.1:3000/mcp",
-    "test": "vitest run",
+    "test": "vitest run --dir test",
     "prepublishOnly": "pnpm clean && pnpm typecheck && pnpm lint && pnpm build"
   },
   "keywords": [
