@@ -6,9 +6,14 @@ import { ankiClient } from '../utils/ankiClient.js';
  */
 export function registerStatisticResources(server: McpServer) {
   // Static resource: Get number of cards reviewed by day
-  server.resource(
+  server.registerResource(
     'cards_reviewed_by_day',
     'anki:///statistics/cards-reviewed-by-day',
+    {
+      title: 'Reviews per day',
+      description: 'Number of cards reviewed on each day, as [date, count] pairs.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const reviewsByDay = await ankiClient.statistic.getNumCardsReviewedByDay();
@@ -30,9 +35,14 @@ export function registerStatisticResources(server: McpServer) {
   );
 
   // Static resource: Get number of cards reviewed today
-  server.resource(
+  server.registerResource(
     'cards_reviewed_today',
     'anki:///statistics/cards-reviewed-today',
+    {
+      title: 'Reviews today',
+      description: 'Number of cards reviewed today.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const reviewsToday = await ankiClient.statistic.getNumCardsReviewedToday();
@@ -54,11 +64,16 @@ export function registerStatisticResources(server: McpServer) {
   );
 
   // Resource template: Get card reviews for a deck
-  server.resource(
+  server.registerResource(
     'card_reviews',
     new ResourceTemplate('anki:///statistics/decks/{deckName}/reviews/{startID}', {
       list: undefined,
     }),
+    {
+      title: 'Deck review log',
+      description: 'Review log entries for a deck after the given review ID (use 0 for all).',
+      mimeType: 'application/json',
+    },
     async (uri, { deckName, startID }) => {
       const deckNameString = Array.isArray(deckName) ? deckName[0] : deckName;
       const startIDString = Array.isArray(startID) ? startID[0] : startID;
@@ -99,11 +114,17 @@ export function registerStatisticResources(server: McpServer) {
   );
 
   // Resource template: Get latest review ID for a deck
-  server.resource(
+  server.registerResource(
     'latest_review_id',
     new ResourceTemplate('anki:///statistics/decks/{deckName}/latest-review-id', {
       list: undefined,
     }),
+    {
+      title: 'Latest review ID',
+      description:
+        'ID of the most recent review in the named deck, for incremental review-log reads.',
+      mimeType: 'application/json',
+    },
     async (uri, { deckName }) => {
       const deckNameString = Array.isArray(deckName) ? deckName[0] : deckName;
       if (!deckNameString) {
@@ -138,9 +159,14 @@ export function registerStatisticResources(server: McpServer) {
   );
 
   // Resource template: Get reviews for specific cards
-  server.resource(
+  server.registerResource(
     'reviews_of_cards',
     new ResourceTemplate('anki:///statistics/cards/{cardIds}/reviews', { list: undefined }),
+    {
+      title: 'Card review history',
+      description: 'Review log entries for each of the comma-separated card IDs.',
+      mimeType: 'application/json',
+    },
     async (uri, { cardIds }) => {
       const cardIdsString = Array.isArray(cardIds) ? cardIds[0] : cardIds;
       if (!cardIdsString) {
@@ -172,9 +198,15 @@ export function registerStatisticResources(server: McpServer) {
   );
 
   // Resource template: Get collection statistics HTML
-  server.resource(
+  server.registerResource(
     'collection_stats_html',
     new ResourceTemplate('anki:///statistics/collection/{wholeCollection}', { list: undefined }),
+    {
+      title: 'Collection statistics report',
+      description:
+        "Anki's statistics page as HTML; pass true for the whole collection or false for the current deck.",
+      mimeType: 'text/html',
+    },
     async (uri, { wholeCollection }) => {
       const wholeCollectionString = Array.isArray(wholeCollection)
         ? wholeCollection[0]

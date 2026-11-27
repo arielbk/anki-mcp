@@ -2,9 +2,11 @@
 
 [![NPM Package anki-mcp](https://img.shields.io/npm/v/@arielbk/anki-mcp.svg)](https://npmjs.com/package/@arielbk/anki-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/arielbk/anki-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/arielbk/anki-mcp/actions/workflows/ci.yml)
+[![anki-mcp MCP server](https://glama.ai/mcp/servers/arielbk/anki-mcp/badges/score.svg)](https://glama.ai/mcp/servers/arielbk/anki-mcp)
 <br />
-<a href="https://glama.ai/mcp/servers/@arielbk/anki-mcp">
-<img width="380" height="200" src="https://glama.ai/mcp/servers/@arielbk/anki-mcp/badge" alt="Anki MCP server" />
+<a href="https://glama.ai/mcp/servers/arielbk/anki-mcp">
+<img width="380" height="200" src="https://glama.ai/mcp/servers/arielbk/anki-mcp/badge" alt="Anki MCP server" />
 </a>
 
 Transform your Anki flashcard experience with AI! This [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server bridges your Anki flashcard collection with AI assistants like Claude, enabling natural conversations about your study materials.
@@ -50,7 +52,7 @@ Imagine having an AI tutor that knows your entire flashcard collection and can:
 
 ## 🛠 Technical Stack
 
-- **[Node.js](https://nodejs.org/)**: Runtime environment (18+ required)
+- **[Node.js](https://nodejs.org/)**: Runtime environment (20+ required)
 - **[TypeScript](https://www.typescriptlang.org/)**: Type safety and developer experience
 - **[MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)**: Model Context Protocol implementation
 - **[yanki-connect](https://www.npmjs.com/package/yanki-connect)**: 🙏 _Fully-typed, isomorphic AnkiConnect API client_
@@ -61,9 +63,9 @@ _Special thanks to the [yanki-connect](https://github.com/kitschpatrol/yanki-con
 
 ## 📋 Prerequisites
 
-### 1. Install Anki
+### 1. Install Anki and Node.js
 
-Download and install [Anki](https://apps.ankiweb.net/) if you haven't already.
+Download and install [Anki](https://apps.ankiweb.net/) if you haven't already, plus [Node.js](https://nodejs.org/) 20 or newer.
 
 ### 2. Install AnkiConnect Plugin
 
@@ -87,31 +89,33 @@ AnkiConnect works out of the box, but you can customize settings:
 
 ### Option 1: Use with Claude Desktop (Recommended)
 
-1. **Install the package**
-
-   ```bash
-   npm install -g @arielbk/anki-mcp
-   ```
-
-2. **Configure Claude Desktop**
+1. **Configure Claude Desktop**
 
    Edit your Claude Desktop configuration file:
 
    **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
    **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-   Add this configuration:
+   Add this configuration (`npx` downloads and runs the latest release):
 
    ```json
    {
      "mcpServers": {
        "anki": {
-         "command": "anki-mcp",
-         "args": []
+         "command": "npx",
+         "args": ["-y", "@arielbk/anki-mcp"]
        }
      }
    }
    ```
+
+2. **Or install globally** if you prefer a fixed version on your machine:
+
+   ```bash
+   npm install -g @arielbk/anki-mcp
+   ```
+
+   and use `"command": "anki-mcp"` with `"args": []` in the config above.
 
 3. **Restart Claude Desktop**
 
@@ -179,6 +183,19 @@ node dist/index.js --http --host=127.0.0.1 --port=3000
 
 Clients that support Streamable HTTP can connect directly. Legacy SSE clients may still work via client-side fallback.
 
+When bound to a loopback address (the default), the HTTP server rejects requests whose `Host` header is not `localhost`, `127.0.0.1` or `[::1]` (DNS rebinding protection). If you bind to another interface, set `ALLOWED_HOSTS` to a comma-separated list of hostnames to keep that check.
+
+### Option 4: Container
+
+The repository includes a `Dockerfile`. It works with any OCI-compatible container tool, such as Podman or Rancher Desktop with the `docker`/`nerdctl` CLI:
+
+```bash
+podman build -t anki-mcp .
+podman run -i --rm anki-mcp
+```
+
+AnkiConnect must be reachable from inside the container for tool calls to work. Listing tools and resources works without it.
+
 ## 🎮 Usage Examples
 
 Once configured with Claude Desktop, you can have natural conversations like:
@@ -217,9 +234,10 @@ Claude: I'll help you organize those cards...
 
 ## 🔧 Available Tools
 
-The server provides **7 intuitive tools** that cover everything you need:
+The server provides **8 high-level tools**. Each takes an `operation` parameter, so a handful of tools covers the whole AnkiConnect API:
 
-### 📝 **Manage Flashcards**
+### 📝 **Manage Flashcards** (`manage_flashcards`)
+
 Create, update, delete, and search your flashcards. Perfect for content creation, bulk updates, and organization.
 
 #### Batch creation (`create_batch`)
@@ -245,13 +263,21 @@ Capital of France,Paris,geography
 ```
 
 ```json
-{ "operation": "create_batch", "filePath": "/Users/me/cards.csv", "deckName": "Interview prep", "modelName": "Basic", "dryRun": true }
+{
+  "operation": "create_batch",
+  "filePath": "/Users/me/cards.csv",
+  "deckName": "Interview prep",
+  "modelName": "Basic",
+  "dryRun": true
+}
 ```
 
-### 🎯 **Study Sessions**
+### 🎯 **Study Sessions** (`study_session`)
+
 Run interactive quiz sessions, manage card scheduling, and track which cards need review.
 
-### 📚 **Manage Decks**
+### 📚 **Manage Decks** (`manage_decks`)
+
 Create and organize decks, move cards around, and configure deck settings.
 
 #### Per-deck daily limits
@@ -264,17 +290,31 @@ Decks usually share an options preset (e.g. "Default"), so changing it changes e
 
 If the deck uses a shared preset, it is cloned into a new preset named after the deck, assigned to that deck only, and then changed. Other decks are not affected.
 
-### 📊 **Get Analytics**
+### 📊 **Get Analytics** (`get_analytics`)
+
 Dive into your study statistics, review history, and learning patterns.
 
-### 🎨 **Manage Models**
+### 🎨 **Manage Models** (`manage_models`)
+
 Customize note types, add fields, modify templates, and style your cards. `list` shows each note type's field names, so agents don't have to guess `Front`/`Back`.
 
-### 🔧 **Anki Operations**
+### 🔧 **Anki Operations** (`anki_operations`)
+
 Handle sync, media files, imports/exports, and other utility operations.
 
-### 🖼️ **Get Media File**
+### 🖼️ **Get Media File** (`get_media_file`)
+
 Retrieve media files (images, audio, etc.) from your Anki collection. AI assistants can analyze images directly (though they won't display in the UI).
+
+### 🖥️ **Anki GUI** (`anki_gui`)
+
+Drive the Anki desktop app: open the Card Browser with a search, open pre-filled Add Cards or Edit dialogs, start a deck review and answer cards on screen, or read the current card and the browser selection. These operations change what is shown in Anki (and `exit_anki` quits it), so prefer the other tools for anything that doesn't need the UI.
+
+> **Upgrading from 0.5.x:** the separate `gui_*` tools were merged into `anki_gui`. `gui_browse` is now `anki_gui` with `operation: "browse"`, and so on.
+
+### 📚 Resources
+
+The server also exposes read-only MCP resources under `anki:///` (deck names, note types, card and note details, review statistics) for clients that support resources.
 
 ## ✍️ Prompt: writing good flashcards
 
@@ -288,8 +328,10 @@ The server also provides an MCP prompt, `writing_good_flashcards` (optional `top
 # Run in development mode with auto-reloading
 pnpm dev
 
-# Lint the code
+# Type-check, lint and check formatting (what CI runs)
+pnpm typecheck
 pnpm lint
+pnpm format:check
 
 # Run unit tests (AnkiConnect is mocked; tests never touch your collection)
 pnpm test

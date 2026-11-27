@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        # Skip while package.json still has the npm-init placeholder test script.
+        run: |
+          if node -e "process.exit(/no test specified/.test(require('./package.json').scripts?.test ?? 'no test specified') ? 1 : 0)"; then
+            pnpm test
+          else
+            echo "No test suite configured; skipping."
+          fi
+
+      - name: server.json version matches package.json
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const srv = require('./server.json');
+            const versions = [srv.version, ...(srv.packages ?? []).map((p) => p.version)];
+            const bad = versions.filter((v) => v !== pkg.version);
+            if (bad.length) {
+              console.error('server.json version(s) ' + bad.join(', ') + ' != package.json ' + pkg.version);
+              process.exit(1);
+            }
+          "
+
+      - name: Smoke test (stdio tools/list)
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | timeout 15 node dist/index.js > out.jsonl || true
+          node -e "
+            const lines = require('fs').readFileSync('out.jsonl', 'utf8').trim().split('\n').map(JSON.parse);
+            const tools = lines.find((m) => m.id === 2)?.result?.tools ?? [];
+            if (!tools.length) { console.error('no tools listed'); process.exit(1); }
+            const missing = tools.filter((t) => !t.description).map((t) => t.name);
+            if (missing.length) { console.error('tools without descriptions: ' + missing); process.exit(1); }
+            console.log('listed ' + tools.length + ' tools: ' + tools.map((t) => t.name).join(', '));
+          "

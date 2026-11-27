@@ -25,38 +25,52 @@ function parseNoteIds(uri: URL): number[] {
  */
 export function registerNoteResources(server: McpServer) {
   // Static resource: Get all available note tags
-  server.resource('note_tags', 'anki:///notes/tags', async (uri) => {
-    try {
-      const tags = await ankiClient.note.getTags();
+  server.registerResource(
+    'note_tags',
+    'anki:///notes/tags',
+    {
+      title: 'All tags',
+      description: 'Every tag used in the collection.',
+      mimeType: 'application/json',
+    },
+    async (uri) => {
+      try {
+        const tags = await ankiClient.note.getTags();
 
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(
-              {
-                tags: tags.sort(),
-                count: tags.length,
-                description: 'All available tags in the Anki collection',
-              },
-              null,
-              2
-            ),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get tags: ${error instanceof Error ? error.message : String(error)}`
-      );
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'application/json',
+              text: JSON.stringify(
+                {
+                  tags: tags.sort(),
+                  count: tags.length,
+                  description: 'All available tags in the Anki collection',
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(
+          `Failed to get tags: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  });
+  );
 
   // Resource template: Get note information by IDs
-  server.resource(
+  server.registerResource(
     'notes_info',
     new ResourceTemplate('anki:///notes/{noteIds}/info', { list: undefined }),
+    {
+      title: 'Note details',
+      description: 'Fields, tags, note type and cards for comma-separated note IDs.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const noteIds = parseNoteIds(uri);
@@ -89,9 +103,15 @@ export function registerNoteResources(server: McpServer) {
   );
 
   // Resource template: Get notes by search query
-  server.resource(
+  server.registerResource(
     'notes_search',
     new ResourceTemplate('anki:///notes/search/{query}', { list: undefined }),
+    {
+      title: 'Search notes',
+      description:
+        'Notes matching an Anki search query (URL-encoded): total count plus details for the first 50.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const query = decodeURIComponent(uri.pathname.split('/').pop() || '');
@@ -135,9 +155,14 @@ export function registerNoteResources(server: McpServer) {
   );
 
   // Resource template: Get notes by tag
-  server.resource(
+  server.registerResource(
     'notes_by_tag',
     new ResourceTemplate('anki:///notes/tag/{tag}', { list: undefined }),
+    {
+      title: 'Notes by tag',
+      description: 'Notes carrying the given tag: total count plus details for the first 50.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const tag = decodeURIComponent(uri.pathname.split('/').pop() || '');
@@ -182,9 +207,14 @@ export function registerNoteResources(server: McpServer) {
   );
 
   // Resource template: Get recently modified notes
-  server.resource(
+  server.registerResource(
     'notes_recent',
     new ResourceTemplate('anki:///notes/recent/{days}', { list: undefined }),
+    {
+      title: 'Recently edited notes',
+      description: 'Notes edited in the last N days: total count plus details for the first 50.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const daysParam = uri.pathname.split('/').pop() || '7';
@@ -232,9 +262,14 @@ export function registerNoteResources(server: McpServer) {
   );
 
   // Resource template: Get note modification times
-  server.resource(
+  server.registerResource(
     'notes_mod_times',
     new ResourceTemplate('anki:///notes/{noteIds}/mod-times', { list: undefined }),
+    {
+      title: 'Note modification times',
+      description: 'Last modification time for comma-separated note IDs.',
+      mimeType: 'application/json',
+    },
     async (uri) => {
       try {
         const noteIds = parseNoteIds(uri);
