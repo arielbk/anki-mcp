@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { extname, resolve } from 'node:path';
+import { extname, isAbsolute, join } from 'node:path';
 import { z } from 'zod';
 import type { NoteInput } from './batch.js';
+import { InputError } from './errors.js';
 
 export type NotesFileFormat = 'json' | 'csv' | 'tsv';
 
@@ -23,7 +24,7 @@ export function detectFormat(filePath: string): NotesFileFormat {
   if (ext === '.json') return 'json';
   if (ext === '.csv') return 'csv';
   if (ext === '.tsv' || ext === '.tab' || ext === '.txt') return 'tsv';
-  throw new Error(
+  throw new InputError(
     `Unsupported file type "${ext || '(none)'}" for ${filePath}. Use .json, .csv, or .tsv.`
   );
 }
@@ -33,7 +34,7 @@ export function detectFormat(filePath: string): NotesFileFormat {
  * double quotes, quoted fields may contain the delimiter, newlines and `""`
  * for a literal quote. Handles CRLF and a leading BOM.
  */
-export function parseDelimited(input: string, delimiter: ',' | '\t'): string[][] {
+export function parseDelimited(input: string, delimiter: string): string[][] {
   const text = input.startsWith('﻿') ? input.slice(1) : input;
   const rows: string[][] = [];
   let row: string[] = [];
@@ -70,9 +71,16 @@ export function parseDelimited(input: string, delimiter: ',' | '\t'): string[][]
       i++;
       continue;
     }
-    if (c === '"' && field === '' && !fieldWasQuoted) {
+    // An opening quote may follow whitespace (` "a,b"`); the whitespace is dropped.
+    if (c === '"' && field.trim() === '' && !fieldWasQuoted) {
+      field = '';
       inQuotes = true;
       fieldWasQuoted = true;
+      i++;
+      continue;
+    }
+    // Ignore whitespace between a closing quote and the next delimiter.
+    if (fieldWasQuoted && (c === ' ' || c === '\t') && c !== delimiter) {
       i++;
       continue;
     }
@@ -103,11 +111,21 @@ function splitTags(value: string): string[] {
     .filter(Boolean);
 }
 
-/** Turns rows (first row = header) into notes. */
-export function rowsToNotes(rows: string[][]): NoteInput[] {
-  const [header, ...data] = rows;
-  if (!header) throw new Error('File is empty: expected a header row with field names');
-  const columns = header.map((h) => h.trim());
+/**
+ * Turns rows into notes. The first row is the header unless `header` is
+ * given (e.g. from an Anki `#columns:` line).
+ */
+export function rowsToNotes(rows: string[][], header?: string[]): NoteInput[] {
+  const [first, ...rest] = rows;
+  if (!header && !first) throw new Error('File is empty: expected a header row with field names');
+  const columnsRow = header ?? first ?? [];
+  const data = header ? rows : rest;
+  const dataOffset = header ? 1 : 2;
+  if (columnsRow.length === 0) {
+    throw new Error('File is empty: expected a header row with field names');
+  }
+  const headerRow = columnsRow;
+  const columns = headerRow.map((h) => h.trim());
   if (columns.some((c) => c === '')) throw new Error('Header row has an empty column name');
 
   const fieldColumns = columns.filter((c) => {
@@ -121,7 +139,7 @@ export function rowsToNotes(rows: string[][]): NoteInput[] {
   return data.map((cells, rowIndex) => {
     if (cells.length > columns.length) {
       throw new Error(
-        `Row ${rowIndex + 2} has ${cells.length} columns but the header has ${columns.length}`
+        `Row ${rowIndex + dataOffset} has ${cells.length} columns but the header has ${columns.length}`
       );
     }
     const note: NoteInput = { fields: {} };
@@ -166,16 +184,86 @@ export function parseJsonNotes(text: string): NoteInput[] {
   });
 }
 
+const SEPARATORS: Record<string, string> = {
+  tab: '\t',
+  comma: ',',
+  semicolon: ';',
+  pipe: '|',
+  space: ' ',
+};
+
+interface AnkiHeaders {
+  separator?: string;
+  columns?: string;
+  deck?: string;
+  notetype?: string;
+  tags?: string;
+  /** 1-based column index -> special column name (deck/model/tags). */
+  columnRoles: Map<number, string>;
+}
+
+/**
+ * Strips Anki text-export header lines (`#separator:tab`, `#html:true`,
+ * `#columns:Front\tBack`, `#deck:Name`, `#tags column:3`, ...) from the top
+ * of the file.
+ */
+export function stripAnkiHeaders(text: string): { body: string; headers: AnkiHeaders } {
+  const headers: AnkiHeaders = { columnRoles: new Map() };
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+  let n = 0;
+  for (; n < lines.length; n++) {
+    const match = /^#([a-z ]+):(.*)$/i.exec(lines[n] ?? '');
+    if (!match) break;
+    const key = (match[1] ?? '').trim().toLowerCase();
+    const value = match[2] ?? '';
+    const column = /^(deck|notetype|tags) column$/.exec(key);
+    if (column) {
+      const index = Number(value.trim());
+      const role = column[1] === 'notetype' ? 'model' : (column[1] ?? '');
+      if (Number.isInteger(index) && index > 0) headers.columnRoles.set(index, role);
+    } else if (key === 'separator') {
+      const lower = value.trim().toLowerCase();
+      headers.separator = SEPARATORS[lower] ?? value;
+    } else if (key === 'columns' || key === 'deck' || key === 'notetype' || key === 'tags') {
+      headers[key] = value;
+    }
+  }
+  return { body: lines.slice(n).join('\n'), headers };
+}
+
 export function parseNotesText(text: string, format: NotesFileFormat): NoteInput[] {
   if (format === 'json') return parseJsonNotes(text);
-  return rowsToNotes(parseDelimited(text, format === 'csv' ? ',' : '\t'));
+  const { body, headers } = stripAnkiHeaders(text);
+  const delimiter = headers.separator ?? (format === 'csv' ? ',' : '\t');
+  let header = headers.columns ? (parseDelimited(headers.columns, delimiter)[0] ?? []) : undefined;
+  const rows = parseDelimited(body, delimiter);
+  if (headers.columnRoles.size > 0) {
+    header = [...(header ?? rows.shift() ?? [])];
+    for (const [index, role] of headers.columnRoles) {
+      if (index <= header.length) header[index - 1] = role;
+    }
+  }
+  const notes = rowsToNotes(rows, header);
+  const fixedTags = headers.tags?.split(/\s+/).filter(Boolean) ?? [];
+  return notes.map((note) => {
+    const result: NoteInput = { ...note };
+    if (!result.deckName && headers.deck?.trim()) result.deckName = headers.deck.trim();
+    if (!result.modelName && headers.notetype?.trim()) result.modelName = headers.notetype.trim();
+    if (fixedTags.length > 0) result.tags = [...new Set([...fixedTags, ...(note.tags ?? [])])];
+    return result;
+  });
 }
 
 export function resolveFilePath(filePath: string): string {
   if (filePath === '~' || filePath.startsWith('~/')) {
-    return resolve(homedir(), filePath.slice(2));
+    return join(homedir(), filePath.slice(2));
   }
-  return resolve(filePath);
+  if (!isAbsolute(filePath)) {
+    throw new InputError(
+      `filePath must be absolute (got "${filePath}"). The MCP server's working directory is usually not your project folder; pass the full path, e.g. /Users/me/cards.csv or ~/cards.csv.`
+    );
+  }
+  return filePath;
 }
 
 /** Reads and parses a JSON/CSV/TSV notes file. */
@@ -186,14 +274,14 @@ export async function readNotesFile(filePath: string): Promise<NoteInput[]> {
   try {
     text = await readFile(fullPath, 'utf8');
   } catch (error) {
-    throw new Error(
+    throw new InputError(
       `Couldn't read ${fullPath}: ${error instanceof Error ? error.message : String(error)}`
     );
   }
   try {
     return parseNotesText(text, format);
   } catch (error) {
-    throw new Error(
+    throw new InputError(
       `Couldn't parse ${fullPath}: ${error instanceof Error ? error.message : String(error)}`
     );
   }

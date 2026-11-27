@@ -1,5 +1,5 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,7 +7,9 @@ import {
   parseDelimited,
   parseNotesText,
   readNotesFile,
+  resolveFilePath,
 } from '../src/utils/notesFile.js';
+import { InputError } from '../src/utils/errors.js';
 
 describe('parseDelimited', () => {
   it('splits simple CSV rows', () => {
@@ -39,6 +41,13 @@ describe('parseDelimited', () => {
 
   it('treats quotes inside an unquoted field literally', () => {
     expect(parseDelimited('say "hi",b', ',')).toEqual([['say "hi"', 'b']]);
+  });
+
+  it('allows whitespace around quoted fields', () => {
+    expect(parseDelimited('Front,Back\n x , "q,r" \n', ',')).toEqual([
+      ['Front', 'Back'],
+      [' x ', 'q,r'],
+    ]);
   });
 
   it('throws on an unterminated quote', () => {
@@ -85,6 +94,28 @@ describe('parseNotesText', () => {
     ]);
   });
 
+  it('skips Anki export headers and uses #columns as the header row', () => {
+    const tsv = [
+      '#separator:tab',
+      '#html:true',
+      '#columns:Front\tBack\tTags',
+      '#deck:Exported',
+      'q1\ta1\tx y',
+      'q2\ta2\t',
+    ].join('\n');
+    expect(parseNotesText(tsv, 'tsv')).toEqual([
+      { fields: { Front: 'q1', Back: 'a1' }, tags: ['x', 'y'], deckName: 'Exported' },
+      { fields: { Front: 'q2', Back: 'a2' }, deckName: 'Exported' },
+    ]);
+  });
+
+  it('honours #separator and "#notetype column:N" without #columns', () => {
+    const text = '#separator:Semicolon\n#notetype column:3\nFront;Back;x\nq;a;Basic\n';
+    expect(parseNotesText(text, 'csv')).toEqual([
+      { fields: { Front: 'q', Back: 'a' }, modelName: 'Basic' },
+    ]);
+  });
+
   it('reports which JSON note is invalid', () => {
     expect(() => parseNotesText('[{"fields":{"Front":"q"}},{"front":"x"}]', 'json')).toThrow(
       /Note #2/
@@ -108,6 +139,13 @@ describe('detectFormat / readNotesFile', () => {
     const file = join(dir, 'cards.csv');
     await writeFile(file, 'Front,Back\nq,a\n');
     await expect(readNotesFile(file)).resolves.toEqual([{ fields: { Front: 'q', Back: 'a' } }]);
+  });
+
+  it('rejects relative paths and expands ~', () => {
+    expect(() => resolveFilePath('cards.csv')).toThrow(/must be absolute/);
+    expect(() => resolveFilePath('./cards.csv')).toThrow(InputError);
+    expect(resolveFilePath('~/cards.csv')).toBe(join(homedir(), 'cards.csv'));
+    expect(resolveFilePath('/tmp/cards.csv')).toBe('/tmp/cards.csv');
   });
 
   it('gives a clear error for a missing file', async () => {

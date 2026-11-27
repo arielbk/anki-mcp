@@ -244,17 +244,17 @@ Create, update, delete, and search your flashcards. Perfect for content creation
 
 - **Defaults:** top-level `deckName`, `modelName` and `tags` apply to every note. A note's own `deckName`/`modelName` override the defaults; its `tags` are added to the default tags.
 - **Chunking:** notes are sent one chunk at a time (`chunkSize`, default 10, max 50) with a short pause between chunks, so large imports don't overload Anki.
-- **Per-note results:** every note is reported as `#n "first 40 chars of the first field"` with its new note ID or the reason it failed (duplicate, unknown note type, wrong field names, empty first field, ...).
+- **Per-note results:** every note is reported as `#n "first 40 chars of the first field"` with its new note ID or the reason it failed (duplicate in the collection or earlier in the same batch, unknown note type, wrong field names, empty first field, ...). Field names match case-insensitively (`front` works for `Front`).
 - **Partial failure:** if Anki stops responding partway, the batch stops and reports which notes were saved, which chunk may or may not have been saved, and which notes to resend.
 - **Duplicates:** `allowDuplicate: true` allows notes whose first field already exists; `duplicateScope: "deck"` checks for duplicates only in the target deck (default: whole collection).
 - **Dry run:** `dryRun: true` validates every note (note type, field names, duplicates) without writing anything.
 
 #### Import from a file
 
-Instead of `notes`, pass `filePath` (absolute path) to a `.json`, `.csv` or `.tsv` file. An agent can draft cards to a file for you to review, then import them in one call without sending every card through the conversation.
+Instead of `notes`, pass `filePath` (an absolute path or `~/...`; relative paths are rejected because the server's working directory is usually not your project) to a `.json`, `.csv` or `.tsv` file. An agent can draft cards to a file for you to review, then import them in one call without sending every card through the conversation.
 
 - **JSON:** an array of notes, same shape as `notes`: `[{ "fields": { "Front": "...", "Back": "..." }, "tags": ["x"] }]`
-- **CSV / TSV:** the header row holds the field names. Optional `tags` (space-separated), `deck` and `model` columns set those per row. Quoted fields may contain commas, tabs, newlines and `""` for a literal quote.
+- **CSV / TSV:** the header row holds the field names. Optional `tags` (space-separated), `deck` and `model` columns set those per row. Quoted fields may contain commas, tabs, newlines and `""` for a literal quote. Anki text-export header lines (`#separator:`, `#html:`, `#columns:`, `#deck:`, `#notetype:`, `#tags:`) are understood; `#columns:` replaces the header row.
 
 ```csv
 Front,Back,tags
