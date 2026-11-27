@@ -1,4 +1,4 @@
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import { FLASHCARD_PROMPT_NAME } from '../prompts/index.js';
 
 /**

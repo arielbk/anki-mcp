@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { ankiClient } from '../utils/ankiClient.js';
 import {
@@ -74,7 +74,7 @@ export function registerConsolidatedTools(server: McpServer) {
       title: 'Manage flashcards',
       description: DESCRIPTIONS.manage_flashcards,
       annotations: DESTRUCTIVE_WRITE,
-      inputSchema: {
+      inputSchema: z.object({
         operation: z
           .enum([
             'create',
@@ -173,7 +173,7 @@ export function registerConsolidatedTools(server: McpServer) {
 
         // get_info
         cardIds: z.array(z.number()).optional().describe('get_info: card IDs (max 50)'),
-      },
+      }),
     },
     async (
       {
@@ -196,7 +196,7 @@ export function registerConsolidatedTools(server: McpServer) {
         offset = 0,
         cardIds,
       },
-      extra
+      ctx
     ) => {
       const isWrite = !['find', 'get_info'].includes(operation) && !dryRun;
       try {
@@ -254,7 +254,7 @@ export function registerConsolidatedTools(server: McpServer) {
             }
 
             const resolved = resolveNotes(inputNotes, { deckName, modelName, tags });
-            const progressToken = extra._meta?.progressToken;
+            const progressToken = ctx.mcpReq._meta?.progressToken;
             const report = await runBatch(ankiClient, resolved, {
               chunkSize,
               dryRun,
@@ -264,8 +264,8 @@ export function registerConsolidatedTools(server: McpServer) {
                 progressToken === undefined
                   ? undefined
                   : (done, total) =>
-                      extra
-                        .sendNotification({
+                      ctx.mcpReq
+                        .notify({
                           method: 'notifications/progress',
                           params: {
                             progressToken,
@@ -443,7 +443,7 @@ export function registerConsolidatedTools(server: McpServer) {
       title: 'Study session and scheduling',
       description: DESCRIPTIONS.study_session,
       annotations: DESTRUCTIVE_WRITE,
-      inputSchema: {
+      inputSchema: z.object({
         operation: z
           .enum(['find_due', 'answer', 'suspend', 'unsuspend', 'check_status', 'forget', 'relearn'])
           .describe('Which operation to run; see the tool description for required parameters'),
@@ -467,7 +467,7 @@ export function registerConsolidatedTools(server: McpServer) {
           )
           .optional()
           .describe('answer: one entry per reviewed card'),
-      },
+      }),
     },
     async ({ operation, query, cardIds, answers }) => {
       const isWrite = !['find_due', 'check_status'].includes(operation);
@@ -622,7 +622,7 @@ export function registerConsolidatedTools(server: McpServer) {
       title: 'Manage decks',
       description: DESCRIPTIONS.manage_decks,
       annotations: DESTRUCTIVE_WRITE,
-      inputSchema: {
+      inputSchema: z.object({
         operation: z
           .enum([
             'create',
@@ -676,7 +676,7 @@ export function registerConsolidatedTools(server: McpServer) {
           .number()
           .optional()
           .describe('set_config: ID of an existing options preset (see get_config)'),
-      },
+      }),
     },
     async ({
       operation,
@@ -849,7 +849,7 @@ export function registerConsolidatedTools(server: McpServer) {
       title: 'Study analytics',
       description: DESCRIPTIONS.get_analytics,
       annotations: READ_ONLY,
-      inputSchema: {
+      inputSchema: z.object({
         scope: z
           .enum([
             'deck_stats',
@@ -875,7 +875,7 @@ export function registerConsolidatedTools(server: McpServer) {
           .describe(
             'collection_stats: true (default) for all decks, false for the current deck only'
           ),
-      },
+      }),
     },
     async ({ scope, deckName, cardIds, startTimestamp, wholeCollection }) => {
       try {
@@ -995,7 +995,7 @@ export function registerConsolidatedTools(server: McpServer) {
       title: 'Manage note types',
       description: DESCRIPTIONS.manage_models,
       annotations: DESTRUCTIVE_WRITE,
-      inputSchema: {
+      inputSchema: z.object({
         operation: z
           .enum([
             'list',
@@ -1050,7 +1050,7 @@ export function registerConsolidatedTools(server: McpServer) {
           })
           .optional()
           .describe('add_template: template to add, { Front, Back } HTML'),
-      },
+      }),
     },
     async ({
       operation,
@@ -1229,7 +1229,7 @@ export function registerConsolidatedTools(server: McpServer) {
       title: 'Anki utilities: sync, packages, media',
       description: DESCRIPTIONS.anki_operations,
       annotations: DESTRUCTIVE_WRITE_OPEN_WORLD,
-      inputSchema: {
+      inputSchema: z.object({
         operation: z
           .enum([
             'sync',
@@ -1269,7 +1269,7 @@ export function registerConsolidatedTools(server: McpServer) {
           .optional()
           .describe('store_media: URL Anki downloads the file from (or use mediaData)'),
         pattern: z.string().optional().describe('list_media: glob pattern, e.g. "*.png" or "*"'),
-      },
+      }),
     },
     async ({
       operation,
@@ -1454,11 +1454,11 @@ export function registerConsolidatedTools(server: McpServer) {
       title: 'Get media file contents',
       description: DESCRIPTIONS.get_media_file,
       annotations: READ_ONLY,
-      inputSchema: {
+      inputSchema: z.object({
         filename: z
           .string()
           .describe('Bare media file name as referenced in a card, e.g. "image.png" (no paths)'),
-      },
+      }),
     },
     async ({ filename }) => {
       try {

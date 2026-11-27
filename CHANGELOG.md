@@ -8,8 +8,26 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 ## [Unreleased]
 
+### Added
+
+- Support for the stateless MCP 2026-07-28 revision (`server/discover`, per-request
+  `_meta` envelope) over both stdio and HTTP. 2025-era clients that use the `initialize`
+  handshake keep working unchanged.
+
 ### Changed
 
+- Migrated from `@modelcontextprotocol/sdk` 1.x to the v2 SDK packages
+  (`@modelcontextprotocol/server`, `/node`, `/express`). Tool names, descriptions,
+  annotations, resource URIs and prompt names are unchanged. Tool input schemas now
+  declare JSON Schema draft 2020-12 (the MCP default) instead of draft-07, and tools no
+  longer advertise `execution.taskSupport`.
+- **Breaking-ish (HTTP mode only):** HTTP mode is now stateless. No `Mcp-Session-Id` is
+  issued, each request is served by a fresh server instance, and `GET`/`DELETE /mcp`
+  (2025 session operations) return `405`. Clients that follow the spec handle this; one
+  that requires a session ID will need updating. stdio mode is unaffected.
+- HTTP mode on loopback now also rejects a browser `Origin` header from a foreign host;
+  requests without an `Origin` header are still accepted.
+- Shutdown messages go to stderr instead of stdout.
 - Lint warnings fixed; ESLint and Vitest ignore local worktrees.
 - The Publish workflow waits for a new version to appear on npm before registering it
   with the MCP registry.

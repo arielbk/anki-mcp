@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 export const FLASHCARD_PROMPT_NAME = 'writing_good_flashcards';
@@ -32,12 +32,12 @@ export function registerPrompts(server: McpServer) {
       title: 'Writing good flashcards',
       description:
         'Guidelines for writing effective spaced-repetition cards (minimum information principle, one fact per card, no yes/no questions, multiple angles, only understood material), based on Matuschak and SuperMemo. Use before creating cards with manage_flashcards.',
-      argsSchema: {
+      argsSchema: z.object({
         topic: z
           .string()
           .optional()
           .describe('What the cards should cover, e.g. a topic, notes, or source text'),
-      },
+      }),
     },
     ({ topic }) => ({
       messages: [
