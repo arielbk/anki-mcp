@@ -1,4 +1,10 @@
-import { AnkiConnectionError, errorMessage, isAnkiReachable, isConnectionError } from './errors.js';
+import {
+  AnkiConnectionError,
+  InputError,
+  errorMessage,
+  isAnkiReachable,
+  isConnectionError,
+} from './errors.js';
 
 /** A note as given by the caller; deck/model may come from batch defaults. */
 export interface NoteInput {
@@ -38,6 +44,12 @@ export interface BatchClient {
     canAddNotesWithErrorDetail: (params: {
       notes: AnkiNote[];
     }) => Promise<Array<{ canAdd: true } | { canAdd: false; error: string }>>;
+    findNotes: (params: { query: string }) => Promise<number[]>;
+    notesInfo: (params: {
+      notes: number[];
+    }) => Promise<
+      Array<{ noteId: number; fields: Record<string, { value: string; order: number }> }>
+    >;
   };
   model: {
     modelNamesAndIds: () => Promise<Record<string, number>>;
@@ -74,6 +86,8 @@ export interface BatchRunOptions extends AddOptions {
   dryRun?: boolean | undefined;
   sleep?: ((ms: number) => Promise<void>) | undefined;
   onProgress?: ((done: number, total: number) => void | Promise<void>) | undefined;
+  /** Clock override for tests. */
+  now?: (() => number) | undefined;
 }
 
 export const DEFAULT_CHUNK_SIZE = 10;
@@ -118,21 +132,31 @@ export function resolveNotes(notes: NoteInput[], defaults: BatchDefaults = {}): 
     return { deckName: deckName ?? '', modelName: modelName ?? '', fields: note.fields, tags };
   });
   if (problems.length > 0) {
-    throw new Error(
+    throw new InputError(
       `Some notes have no deck or note type. Set top-level deckName/modelName as defaults or give them per note:\n${problems.join('\n')}`
     );
   }
   return resolved;
 }
 
+interface ModelCheck {
+  /** Reason per failing note index. */
+  failures: Map<number, string>;
+  /** Notes with field names rewritten to the note type's casing. */
+  notes: ResolvedNote[];
+  /** Ordered field names per note type. */
+  fieldsByModel: Map<string, string[]>;
+}
+
 /**
- * Checks model names and field names locally (one request for the model
- * list, one for the models' fields). Returns a reason per failing note index.
+ * Checks note types and field names locally (one request for the model list,
+ * one for the models' fields). Field names match case-insensitively, like
+ * AnkiConnect does, and are rewritten to the note type's own casing.
  */
 export async function checkModelsAndFields(
   client: BatchClient,
   notes: ResolvedNote[]
-): Promise<Map<number, string>> {
+): Promise<ModelCheck> {
   const failures = new Map<number, string>();
   const known = await client.model.modelNamesAndIds();
   const wanted = [...new Set(notes.map((n) => n.modelName))].filter((m) => Object.hasOwn(known, m));
@@ -147,26 +171,104 @@ export async function checkModelsAndFields(
     }
   }
 
-  notes.forEach((note, i) => {
+  const normalized = notes.map((note, i) => {
     const modelFields = fieldsByModel.get(note.modelName);
     if (!Object.hasOwn(known, note.modelName) || !modelFields) {
       failures.set(i, `note type "${note.modelName}" does not exist`);
-      return;
+      return note;
     }
-    const unknown = Object.keys(note.fields).filter((f) => !modelFields.includes(f));
+    const byLower = new Map(modelFields.map((f) => [f.toLowerCase(), f]));
+    const fields: Record<string, string> = {};
+    const unknown: string[] = [];
+    const repeated: string[] = [];
+    for (const [key, value] of Object.entries(note.fields)) {
+      const canonical = byLower.get(key.toLowerCase());
+      if (!canonical) unknown.push(key);
+      else if (Object.hasOwn(fields, canonical)) repeated.push(key);
+      else fields[canonical] = value;
+    }
     if (unknown.length > 0) {
       failures.set(
         i,
         `unknown field(s) ${unknown.map((f) => `"${f}"`).join(', ')} for note type "${note.modelName}" (fields: ${modelFields.join(', ')})`
       );
-      return;
+    } else if (repeated.length > 0) {
+      failures.set(
+        i,
+        `field(s) ${repeated.map((f) => `"${f}"`).join(', ')} given more than once (names are case-insensitive)`
+      );
+    } else {
+      const firstField = modelFields[0];
+      if (firstField && !fields[firstField]?.trim()) {
+        failures.set(i, `first field "${firstField}" is empty`);
+      }
     }
-    const firstField = modelFields[0];
-    if (firstField && !note.fields[firstField]?.trim()) {
-      failures.set(i, `first field "${firstField}" is empty`);
-    }
+    return { ...note, fields };
   });
-  return failures;
+  return { failures, notes: normalized, fieldsByModel };
+}
+
+/**
+ * Finds notes that duplicate an earlier note in the same batch (same note
+ * type and first field, and same deck when duplicateScope is "deck"), which
+ * AnkiConnect's pre-check can't see. Returns a reason per duplicate index.
+ */
+export function findInBatchDuplicates(
+  notes: ResolvedNote[],
+  fieldsByModel: Map<string, string[]>,
+  candidates: number[],
+  options: AddOptions
+): Map<number, string> {
+  const duplicates = new Map<number, string>();
+  if (options.allowDuplicate) return duplicates;
+  const seen = new Map<string, number>();
+  for (const i of candidates) {
+    const note = notes[i];
+    if (!note) continue;
+    const firstField = fieldsByModel.get(note.modelName)?.[0];
+    if (!firstField) continue;
+    const value = (note.fields[firstField] ?? '').trim();
+    const scope = options.duplicateScope === 'deck' ? note.deckName : '';
+    const key = JSON.stringify([note.modelName, scope, value]);
+    const first = seen.get(key);
+    if (first === undefined) seen.set(key, i);
+    else duplicates.set(i, `duplicate of note #${first + 1} in this batch`);
+  }
+  return duplicates;
+}
+
+/** Quotes a value for Anki's search syntax (exact match, no wildcards). */
+export function ankiSearchTerm(term: string): string {
+  const escaped = term.replace(/[\\"*_]/g, (c) => `\\${c}`);
+  return `"${escaped}"`;
+}
+
+/**
+ * After a retry is rejected as a duplicate, checks whether the note was in
+ * fact saved by the chunk request that was rejected (AnkiConnect adds what it
+ * can before reporting errors). Returns the note ID if a note with the same
+ * first field in the target deck/note type was created during this run.
+ */
+async function findSavedDuplicate(
+  client: BatchClient,
+  note: ResolvedNote,
+  firstField: string,
+  startedAt: number
+): Promise<number | undefined> {
+  const value = note.fields[firstField] ?? '';
+  const query = [
+    ankiSearchTerm(`deck:${note.deckName}`),
+    ankiSearchTerm(`note:${note.modelName}`),
+    ankiSearchTerm(`${firstField}:${value}`),
+  ].join(' ');
+  const ids = await client.note.findNotes({ query });
+  if (ids.length === 0) return undefined;
+  const infos = await client.note.notesInfo({ notes: ids });
+  const matches = infos
+    .filter((n) => n.fields[firstField]?.value === value && n.noteId >= startedAt)
+    .map((n) => n.noteId)
+    .sort((a, b) => b - a);
+  return matches[0];
 }
 
 function toAnkiNote(note: ResolvedNote, options: AddOptions): AnkiNote {
@@ -196,15 +298,17 @@ function isUnsupportedAction(error: unknown): boolean {
  */
 export async function runBatch(
   client: BatchClient,
-  notes: ResolvedNote[],
+  inputNotes: ResolvedNote[],
   options: BatchRunOptions = {}
 ): Promise<BatchReport> {
   const chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
   const pauseMs = options.pauseMs ?? DEFAULT_PAUSE_MS;
   const sleep = options.sleep ?? defaultSleep;
   const dryRun = options.dryRun ?? false;
+  // Note IDs are creation timestamps (ms); used to recognise notes saved by this run.
+  const startedAt = (options.now ?? Date.now)() - 1000;
 
-  const outcomes: NoteOutcome[] = notes.map((note, i) => ({
+  const outcomes: NoteOutcome[] = inputNotes.map((note, i) => ({
     index: i + 1,
     label: noteLabel(note.fields),
     status: 'not_attempted',
@@ -214,12 +318,16 @@ export async function runBatch(
     if (outcome) Object.assign(outcome, { status: 'failed', reason });
   };
 
-  // 1. Local model/field checks (read-only).
-  const localFailures = await checkModelsAndFields(client, notes);
-  localFailures.forEach((reason, i) => fail(i, reason));
+  // 1. Local model/field checks (read-only), then duplicates within the batch.
+  const checked = await checkModelsAndFields(client, inputNotes);
+  const notes = checked.notes;
+  checked.failures.forEach((reason, i) => fail(i, reason));
+  let candidates = notes.map((_, i) => i).filter((i) => !checked.failures.has(i));
+  const inBatch = findInBatchDuplicates(notes, checked.fieldsByModel, candidates, options);
+  inBatch.forEach((reason, i) => fail(i, reason));
+  candidates = candidates.filter((i) => !inBatch.has(i));
 
   // 2. Ask AnkiConnect why notes can't be added (read-only).
-  let candidates = notes.map((_, i) => i).filter((i) => !localFailures.has(i));
   const ankiNotes = notes.map((n) => toAnkiNote(n, options));
   try {
     for (const group of chunk(candidates, Math.max(chunkSize, 50))) {
@@ -267,7 +375,14 @@ export async function runBatch(
         }
       });
     } catch (error) {
-      const abort = await handleChunkError(client, error, group, ankiNotes, outcomes, options);
+      const abort = await handleChunkError(client, error, group, {
+        notes,
+        ankiNotes,
+        outcomes,
+        options,
+        fieldsByModel: checked.fieldsByModel,
+        startedAt,
+      });
       if (abort) {
         return { dryRun, chunkSize, outcomes, abortedReason: abort };
       }
@@ -283,10 +398,16 @@ async function handleChunkError(
   client: BatchClient,
   error: unknown,
   group: number[],
-  ankiNotes: AnkiNote[],
-  outcomes: NoteOutcome[],
-  options: AddOptions
+  ctx: {
+    notes: ResolvedNote[];
+    ankiNotes: AnkiNote[];
+    outcomes: NoteOutcome[];
+    options: AddOptions;
+    fieldsByModel: Map<string, string[]>;
+    startedAt: number;
+  }
 ): Promise<string | undefined> {
+  const { notes, ankiNotes, outcomes, options, fieldsByModel, startedAt } = ctx;
   const markUnknown = (indexes: number[], reason: string) =>
     indexes.forEach((i) => {
       const outcome = outcomes[i];
@@ -331,7 +452,31 @@ async function handleChunkError(
         );
         return errorMessage(noteError);
       }
-      Object.assign(outcome, { status: 'failed', reason: errorMessage(noteError) });
+      const reason = errorMessage(noteError);
+      const note = notes[noteIndex];
+      const firstField = note ? fieldsByModel.get(note.modelName)?.[0] : undefined;
+      if (/duplicate/i.test(reason) && note && firstField) {
+        // AnkiConnect saves what it can before rejecting a chunk, so this
+        // "duplicate" is most likely the copy saved by that chunk request.
+        try {
+          const savedId = await findSavedDuplicate(client, note, firstField, startedAt);
+          if (savedId !== undefined) {
+            Object.assign(outcome, { status: 'added', noteId: savedId });
+          } else {
+            Object.assign(outcome, {
+              status: 'unknown',
+              reason: `${reason}; it may have been saved by the rejected chunk request. Check with find before re-adding.`,
+            });
+          }
+        } catch (lookupError) {
+          Object.assign(outcome, {
+            status: 'unknown',
+            reason: `${reason}; couldn't check whether it was saved (${errorMessage(lookupError)}). Check with find before re-adding.`,
+          });
+        }
+        continue;
+      }
+      Object.assign(outcome, { status: 'failed', reason });
     }
   }
   return undefined;
