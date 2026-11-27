@@ -13,16 +13,19 @@ function makeConfig(id: number, name: string): Config {
 }
 
 /** In-memory presets; never talks to a real Anki. */
-function mockClient(initial: { deck: string; config: Config }) {
+function mockClient(initial: { deck: string; config: Config; sharedWith?: string[] }) {
   const configs = new Map<number, Config>([[initial.config.id, initial.config]]);
   const deckToConfig = new Map<string, number>([[initial.deck, initial.config.id]]);
+  for (const other of initial.sharedWith ?? []) deckToConfig.set(other, initial.config.id);
+  const configFor = (deck: string) => {
+    const id = deckToConfig.get(deck);
+    return id === undefined ? false : configs.get(id);
+  };
   let nextId = 100;
   const client = {
     deck: {
-      getDeckConfig: vi.fn(async ({ deck }: { deck: string }) => {
-        const id = deckToConfig.get(deck);
-        return (id === undefined ? false : configs.get(id)) as Config;
-      }),
+      getDeckConfig: vi.fn(async ({ deck }: { deck: string }) => configFor(deck) as Config),
+      deckNames: vi.fn(async () => [...deckToConfig.keys()]),
       cloneDeckConfigId: vi.fn(async ({ cloneFrom, name }: { cloneFrom: number; name: string }) => {
         const source = configs.get(cloneFrom);
         if (!source) return false as const;
@@ -38,6 +41,11 @@ function mockClient(initial: { deck: string; config: Config }) {
         configs.set(config.id, config);
         return true;
       }),
+    },
+    miscellaneous: {
+      multi: vi.fn(async ({ actions }: { actions: Array<{ params: { deck: string } }> }) =>
+        actions.map((a) => ({ result: configFor(a.params.deck), error: null }))
+      ),
     },
   } satisfies DeckLimitsClient;
   return { client, configs };
@@ -68,6 +76,27 @@ describe('setDeckLimits', () => {
     // The shared Default preset is untouched.
     expect(configs.get(1)?.new.perDay).toBe(20);
     expect(configs.get(100)?.new.perDay).toBe(15);
+  });
+
+  it('clones a preset named after the deck when another deck also uses it', async () => {
+    const { client, configs } = mockClient({
+      deck: 'Japanese',
+      config: makeConfig(5, 'Japanese'),
+      sharedWith: ['Japanese::Kanji'],
+    });
+    const result = await setDeckLimits(client, 'Japanese', { newPerDay: 5 });
+    expect(result.cloned).toBe(true);
+    expect(configs.get(5)?.new.perDay).toBe(20); // Kanji's preset untouched
+    expect(client.deck.saveDeckConfig).toHaveBeenCalledWith({
+      config: expect.objectContaining({ id: 100 }),
+    });
+  });
+
+  it('updates a preset in place when only this deck uses it, whatever its name', async () => {
+    const { client } = mockClient({ deck: 'Spanish', config: makeConfig(8, 'My preset') });
+    const result = await setDeckLimits(client, 'Spanish', { newPerDay: 3 });
+    expect(client.deck.cloneDeckConfigId).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ cloned: false, configId: 8, newPerDay: 3 });
   });
 
   it("updates the deck's own preset in place", async () => {
