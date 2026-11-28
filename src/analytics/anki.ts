@@ -65,8 +65,39 @@ export function assertDeckExists(allDecks: string[], deckName: string): void {
 
 const DAY_MS = 86_400_000;
 
+/**
+ * cardReviews only returns reviews of cards whose CURRENT deck is the one
+ * named, so cards of `deckName` that sit in a filtered deck right now are
+ * missed by a per-deck loop. This finds them (deck: searches match a card's
+ * home deck too), asks which filtered decks hold them, and returns those
+ * decks' reviews of just those cards. Costs one findCards when no card of the
+ * deck is in a filtered deck. `fetched` lists decks already read.
+ */
+export async function filteredDeckReviews(
+  client: AnalyticsClient,
+  params: { deckName: string; fetched: string[]; startID: number }
+): Promise<ReviewTuple[]> {
+  const [found] = await runMulti(client, [
+    { action: 'findCards', params: { query: `${deckTerm(params.deckName)} deck:filtered` } },
+  ]);
+  const cardIds = Array.isArray(found) ? (found as number[]) : [];
+  if (cardIds.length === 0) return [];
+  const [byDeck] = await runMulti(client, [{ action: 'getDecks', params: { cards: cardIds } }]);
+  const fetched = new Set(params.fetched);
+  // Deck names come from Anki itself, so cardReviews can't create a deck here.
+  const decks = Object.keys((byDeck ?? {}) as Record<string, number[]>).filter(
+    (d) => !fetched.has(d)
+  );
+  const results = (await runMulti(
+    client,
+    decks.map((deck) => ({ action: 'cardReviews', params: { deck, startID: params.startID } }))
+  )) as ReviewTuple[][];
+  const wanted = new Set(cardIds);
+  return results.flat().filter((t) => wanted.has(t[1]));
+}
+
 export interface RevlogWindow {
-  /** Reviews in the scope decks since roughly `days + 1` days ago. */
+  /** Reviews in the scope decks (and of their cards now in filtered decks) since roughly `days + 1` days ago. */
   reviews: Review[];
   rolloverHour: number;
   rolloverInferred: boolean;
@@ -85,9 +116,11 @@ export async function fetchRevlog(
     days: number;
     todayCount: number;
     now: number;
+    /** The scope's deck; its cards now in filtered decks are added. */
+    deckName?: string | undefined;
   }
 ): Promise<RevlogWindow> {
-  const { allDecks, scopeDecks, days, todayCount, now } = params;
+  const { allDecks, scopeDecks, days, todayCount, now, deckName } = params;
   const windowStart = now - (days + 1) * DAY_MS;
   const recentStart = now - 2 * DAY_MS;
   const inScope = new Set(scopeDecks);
@@ -99,10 +132,13 @@ export async function fetchRevlog(
     })),
     ...others.map((deck) => ({ action: 'cardReviews', params: { deck, startID: recentStart } })),
   ];
-  const results = (await runMulti(client, actions)) as ReviewTuple[][];
-  const reviews = results
-    .slice(0, scopeDecks.length)
-    .flat()
+  const [results, extra] = await Promise.all([
+    runMulti(client, actions) as Promise<ReviewTuple[][]>,
+    deckName
+      ? filteredDeckReviews(client, { deckName, fetched: scopeDecks, startID: windowStart })
+      : Promise.resolve([]),
+  ]);
+  const reviews = [...results.slice(0, scopeDecks.length).flat(), ...extra]
     .map(fromTuple)
     .sort((a, b) => a.id - b.id);
   const recentIds = results

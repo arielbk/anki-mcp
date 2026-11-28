@@ -24,6 +24,7 @@ import {
   decksInScope,
   deckTerm,
   fetchRevlog,
+  filteredDeckReviews,
   runMulti,
   scoped,
   type AnalyticsClient,
@@ -33,6 +34,16 @@ import {
 export const CARD_TYPE_WINDOW_DAYS = 30;
 /** card_reviews lists at most this many rows before switching to a summary. */
 export const CARD_REVIEWS_MAX_ROWS = 300;
+/** Card IDs per getIntervals action. */
+export const INTERVALS_CHUNK = 1000;
+
+/**
+ * Learning and relearning cards, buried ones included: `is:learn` only matches
+ * the learning queues, so buried learning cards (type learning, queue buried)
+ * are added by type. Pair with `is:review -is:learn` for review cards so every
+ * unsuspended seen card is counted exactly once.
+ */
+export const LEARNING_SEARCH = '(is:learn OR (-is:new -is:review))';
 
 const json = (value: unknown) => JSON.stringify(value);
 const hourLabel = (hour: number, inferred: boolean) =>
@@ -57,6 +68,12 @@ function inWindow(reviews: Review[], today: string, days: number, rolloverHour: 
 const list = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 const ids = (value: unknown) => list<number>(value);
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // collection_stats
 // ---------------------------------------------------------------------------
@@ -75,7 +92,7 @@ export async function collectionStats(
 
   const countQueries = {
     new: 'is:new -is:suspended',
-    learning: 'is:learn -is:suspended',
+    learning: `${LEARNING_SEARCH} -is:suspended`,
     young: `is:review -is:learn -is:suspended prop:ivl<21`,
     mature: `is:review -is:learn -is:suspended prop:ivl>=21`,
     suspended: 'is:suspended',
@@ -100,15 +117,18 @@ export async function collectionStats(
     fetchRevlog(client, {
       allDecks: decks,
       scopeDecks: decksInScope(decks, deckName),
+      deckName,
       days: CARD_TYPE_WINDOW_DAYS,
       todayCount: Number(todayCount) || 0,
       now,
     }),
-    reviewCardIds.length
-      ? runMulti(client, [
-          { action: 'getIntervals', params: { cards: reviewCardIds, complete: false } },
-        ])
-      : Promise.resolve([[]]),
+    runMulti(
+      client,
+      chunk(reviewCardIds, INTERVALS_CHUNK).map((cards) => ({
+        action: 'getIntervals',
+        params: { cards, complete: false },
+      }))
+    ),
   ]);
   const { rolloverHour, rolloverInferred } = revlog;
   const today = dayKey(now, rolloverHour);
@@ -145,7 +165,7 @@ export async function collectionStats(
       note: 'review cards due per day; the first day includes overdue cards',
       ...forecast,
     },
-    intervals: intervalStats(ids(intervalsResult[0])),
+    intervals: intervalStats(intervalsResult.flatMap(ids)),
   });
 }
 
@@ -184,6 +204,7 @@ export async function reviewsByDay(
   const revlog = await fetchRevlog(client, {
     allDecks: decks,
     scopeDecks: deckName ? decksInScope(decks, deckName) : [],
+    deckName,
     days: Math.max(1, provisionalDays),
     todayCount: Number(todayCount) || 0,
     now,
@@ -229,7 +250,7 @@ export async function deckOverview(
     { action: 'deckNames' },
     { action: 'getNumCardsReviewedToday' },
     q('is:new -is:suspended'),
-    q('is:learn -is:suspended'),
+    q(`${LEARNING_SEARCH} -is:suspended`),
     q('is:review -is:learn -is:suspended'),
     q('is:suspended'),
     q('is:new'),
@@ -246,6 +267,7 @@ export async function deckOverview(
     fetchRevlog(client, {
       allDecks: decks,
       scopeDecks: decksInScope(decks, deckName),
+      deckName,
       days,
       todayCount: Number(todayCount) || 0,
       now,
@@ -358,6 +380,7 @@ export async function troubleCards(
   const revlog = await fetchRevlog(client, {
     allDecks: decks,
     scopeDecks: decksInScope(decks, deckName),
+    deckName,
     days,
     todayCount: Number(todayCount) || 0,
     now,
@@ -430,15 +453,26 @@ export async function cardReviews(
   }
   const maxRows = params.limit ?? CARD_REVIEWS_MAX_ROWS;
   const [allDecks] = await runMulti(client, [{ action: 'deckNames' }]);
+  const decks = list<string>(allDecks);
   // cardReviews silently creates unknown decks, so check first.
-  assertDeckExists(list<string>(allDecks), deckName);
-  const [tuples] = await runMulti(client, [
-    { action: 'cardReviews', params: { deck: deckName, startID: startTimestamp } },
+  assertDeckExists(decks, deckName);
+  // cardReviews reads one deck (no subdecks), so read each deck in scope, plus
+  // the deck's cards that sit in filtered decks right now.
+  const scopeDecks = decksInScope(decks, deckName);
+  const [perDeck, extra] = await Promise.all([
+    runMulti(
+      client,
+      scopeDecks.map((deck) => ({
+        action: 'cardReviews',
+        params: { deck, startID: startTimestamp },
+      }))
+    ),
+    filteredDeckReviews(client, { deckName, fetched: scopeDecks, startID: startTimestamp }),
   ]);
-  const reviews = list<ReviewTuple>(tuples)
+  const reviews = [...perDeck.flatMap((r) => list<ReviewTuple>(r)), ...extra]
     .map(fromTuple)
     .sort((a, b) => a.id - b.id);
-  const label = `"${deckName}" (this deck only, not subdecks) after ${new Date(startTimestamp).toISOString()}`;
+  const label = `"${deckName}" (incl. subdecks) after ${new Date(startTimestamp).toISOString()}`;
 
   if (reviews.length === 0) return `No reviews for ${label}.`;
 

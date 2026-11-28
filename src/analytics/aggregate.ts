@@ -231,10 +231,16 @@ export function intervalStats(intervals: number[]): {
 } {
   const days = intervals.filter((i) => i > 0);
   if (days.length === 0) return { averageDays: null, longestDays: null };
-  const sum = days.reduce((a, b) => a + b, 0);
+  // A loop, not Math.max(...days): spreading a huge array overflows the stack.
+  let sum = 0;
+  let longest = 0;
+  for (const d of days) {
+    sum += d;
+    if (d > longest) longest = d;
+  }
   return {
     averageDays: Math.round((sum / days.length) * 10) / 10,
-    longestDays: Math.max(...days),
+    longestDays: longest,
   };
 }
 

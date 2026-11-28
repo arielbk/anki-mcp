@@ -3,9 +3,8 @@ import {
   cardState,
   dueIsDayNumber,
   formatCardState,
-  isSeen,
-  queueLabel,
   type CardState,
+  type QueueLabel,
   type SchedulingFields,
 } from './cardState.js';
 import { InputError } from './errors.js';
@@ -32,6 +31,7 @@ export const DEFAULT_MAX_OUTPUT_CHARS = 20_000;
 
 const NOTES_CHUNK = 500;
 const CARDS_CHUNK = 200;
+const DECKS_CHUNK = 5000;
 
 interface NoteInfo {
   noteId: number;
@@ -58,7 +58,7 @@ export interface FindClient {
   };
   miscellaneous: {
     multi: (params: {
-      actions: Array<{ action: 'findCards'; params: { query: string } }>;
+      actions: Array<{ action: 'findCards' | 'findNotes'; params: { query: string } }>;
     }) => Promise<unknown[]>;
   };
 }
@@ -149,6 +149,23 @@ function multiResult(item: unknown): unknown {
     : item;
 }
 
+/** Runs searches in one multi request; returns each result's IDs and throws on errors. */
+async function multiIds(
+  client: FindClient,
+  actions: Array<{ action: 'findCards' | 'findNotes'; params: { query: string } }>
+): Promise<number[][]> {
+  if (actions.length === 0) return [];
+  const results = await client.miscellaneous.multi({ actions });
+  return results.map((item, i) => {
+    if (item !== null && typeof item === 'object' && 'error' in item) {
+      const { error } = item as { error: unknown };
+      if (error) throw new Error(`${actions[i]?.action}: ${String(error)}`);
+    }
+    const ids = multiResult(item);
+    return Array.isArray(ids) ? (ids as number[]) : [];
+  });
+}
+
 /** Offsets tried, nearest first, to anchor Anki's day numbers to today. */
 const ANCHOR_OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, 5, 6, 7, 10, 14, 21, 30, -7, -14, -30];
 
@@ -156,13 +173,15 @@ const ANCHOR_OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, 5, 6, 7, 10, 14, 21, 30, -7, 
  * Anki stores review due dates as day numbers since the collection was
  * created. AnkiConnect doesn't expose that origin, so find a card whose due is
  * a known number of days from today (`prop:due=k`) and read its day number.
+ * Cards in filtered decks are skipped: prop:due reads their original due, but
+ * cardsInfo reports the filtered deck's position and no original due.
  * One multi request plus one small cardsInfo; undefined if nothing matches.
  */
 export async function resolveToday(client: FindClient): Promise<number | undefined> {
   const results = await client.miscellaneous.multi({
     actions: ANCHOR_OFFSETS.map((k) => ({
       action: 'findCards' as const,
-      params: { query: `prop:due=${k}` },
+      params: { query: `prop:due=${k} -deck:filtered` },
     })),
   });
   const candidates: Array<{ cardId: number; offset: number }> = [];
@@ -242,14 +261,23 @@ async function runListing(client: FindClient, query: string, params: FindParams)
     const needCards = include.has('deck') || include.has('state');
     const cardsById = new Map<number, CardInfo>();
     let todayDayNumber: number | undefined;
+    let inFiltered = new Set<number>();
     if (needCards) {
       const cards = await cardsInfoChunked(
         client,
         notes.flatMap((n) => n.cards)
       );
       cards.forEach((c) => cardsById.set(c.cardId, c));
-      if (include.has('state') && cards.some(dueIsDayNumber)) {
-        todayDayNumber = await resolveToday(client).catch(() => undefined);
+      const dayDue = cards.filter(dueIsDayNumber);
+      if (include.has('state') && dayDue.length > 0) {
+        const [today, filtered] = await Promise.all([
+          resolveToday(client).catch(() => undefined),
+          client.card
+            .findCards({ query: `cid:${dayDue.map((c) => c.cardId).join(',')} deck:filtered` })
+            .catch(() => [] as number[]),
+        ]);
+        todayDayNumber = today;
+        inFiltered = new Set(filtered);
       }
     }
     records = pageIds.map((id) => {
@@ -273,7 +301,13 @@ async function runListing(client: FindClient, query: string, params: FindParams)
       }
       if (include.has('model')) record.model = note.modelName;
       if (include.has('state')) {
-        record.cards = cards.map((c) => cardState(c, { todayDayNumber, now: params.now }));
+        record.cards = cards.map((c) =>
+          cardState(c, {
+            todayDayNumber,
+            now: params.now,
+            inFilteredDeck: inFiltered.has(c.cardId),
+          })
+        );
       } else if (include.has('cards')) {
         record.cards = note.cards;
       }
@@ -336,6 +370,33 @@ interface GroupCounts {
   seen: number;
 }
 
+/**
+ * Searches that split cards into queue labels like cardState's queueLabel:
+ * suspended and buried first, then by card type (learning covers buried-free
+ * learning cards in any queue), with relearning split from review by queue.
+ */
+const STATE_SEARCHES: Array<[QueueLabel, string]> = [
+  ['new', 'is:new -is:suspended -is:buried'],
+  ['learning', '-is:new -is:review -is:suspended -is:buried'],
+  ['review', 'is:review -is:learn -is:suspended -is:buried'],
+  ['relearning', 'is:review is:learn -is:suspended -is:buried'],
+  ['suspended', 'is:suspended'],
+  ['buried', 'is:buried'],
+];
+
+async function getDecksChunked(
+  client: FindClient,
+  ids: number[]
+): Promise<Record<string, number[]>> {
+  const out: Record<string, number[]> = {};
+  for (const chunk of chunks(ids, DECKS_CHUNK)) {
+    for (const [deck, deckIds] of Object.entries(await client.deck.getDecks({ cards: chunk }))) {
+      (out[deck] ??= []).push(...deckIds);
+    }
+  }
+  return out;
+}
+
 async function runGroupBy(
   client: FindClient,
   query: string,
@@ -362,18 +423,35 @@ async function runGroupBy(
 
   if (cardIds.length > 0) {
     if (groupBy === 'state') {
-      const cards = await cardsInfoChunked(client, cardIds);
-      const notesByLabel = new Map<string, Set<number>>();
-      for (const card of cards) {
-        const label = queueLabel(card);
-        const fresh = isSeen(card) ? 0 : 1;
-        newTotal += fresh;
-        bump(label, 0, 1, fresh);
-        const set = notesByLabel.get(label) ?? new Set<number>();
-        set.add(card.note);
-        notesByLabel.set(label, set);
-      }
-      for (const [label, set] of notesByLabel) (groups.get(label) as GroupCounts).notes = set.size;
+      // Count with searches only: cardsInfo renders every card's HTML, which
+      // is slow and large for big result sets.
+      const scope = (extra: string) => ({ query: `(${query}) ${extra}` });
+      const results = await multiIds(client, [
+        ...STATE_SEARCHES.flatMap(([, search]) => [
+          { action: 'findCards' as const, params: scope(search) },
+          { action: 'findNotes' as const, params: scope(search) },
+        ]),
+        { action: 'findCards', params: scope('is:new') },
+        { action: 'findCards', params: scope('is:suspended is:new') },
+        { action: 'findCards', params: scope('is:buried is:new') },
+      ]);
+      const [allNew, suspendedNew, buriedNew] = results
+        .slice(STATE_SEARCHES.length * 2)
+        .map((r) => r.length);
+      newTotal = allNew ?? 0;
+      STATE_SEARCHES.forEach(([label], i) => {
+        const cards = results[i * 2]?.length ?? 0;
+        if (cards === 0) return;
+        const fresh =
+          label === 'new'
+            ? cards
+            : label === 'suspended'
+              ? (suspendedNew ?? 0)
+              : label === 'buried'
+                ? (buriedNew ?? 0)
+                : 0;
+        bump(label, results[i * 2 + 1]?.length ?? 0, cards, fresh);
+      });
     } else {
       const newIds = new Set(await client.card.findCards({ query: `(${query}) is:new` }));
       newTotal = cardIds.filter((id) => newIds.has(id)).length;
@@ -381,7 +459,7 @@ async function runGroupBy(
       if (groupBy === 'deck') {
         const noteOf = new Map<number, number>();
         notes.forEach((n) => n.cards.forEach((c) => noteOf.set(c, n.noteId)));
-        const decks = await client.deck.getDecks({ cards: cardIds });
+        const decks = await getDecksChunked(client, cardIds);
         for (const [deck, ids] of Object.entries(decks)) {
           const inDeck = ids.filter((id) => matched.has(id));
           const noteSet = new Set(inDeck.map((id) => noteOf.get(id) ?? -id));

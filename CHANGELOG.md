@@ -40,8 +40,16 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
   there are more than `limit` (default 300) reviews. Other scopes return unindented JSON.
 - Deck-scoped analytics reject unknown deck names with a "did you mean" hint before calling
   AnkiConnect, since `getDeckStats` and `cardReviews` silently create missing decks.
+- `card_reviews` includes subdecks of `deckName`, like the other deck-scoped scopes.
 
 ### Fixed
+
+- `get_stats` matches results by deck ID, so subdecks with the same leaf name
+  (`Spanish::Verbs`, `French::Verbs`) no longer get each other's numbers.
+- Deck-scoped analytics include reviews of the deck's cards that are currently in a
+  filtered deck.
+- `collection_stats` and `deck_overview` count buried learning cards as learning, so the
+  totals no longer drop them.
 
 - `get_stats` no longer creates a deck when given a name that doesn't exist. AnkiConnect's
   `getDeckStats` creates unknown decks, so names are now checked first and missing ones

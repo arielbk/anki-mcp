@@ -57,6 +57,23 @@ describe('formatDue', () => {
     expect(formatDue({ ...card, queue: -1 }, { todayDayNumber: 2152, now })).toBe('2026-11-28');
   });
 
+  it('uses Anki’s day (rollover-aware) as today, not the calendar date', () => {
+    const card = { ...base, queue: 2, type: 2, due: 2149 };
+    // 01:00 on the 28th is still Anki's 27th with the default 4am rollover.
+    const early = new Date(2026, 10, 28, 1);
+    expect(formatDue(card, { todayDayNumber: 2148, now: early })).toBe('2026-11-28');
+    expect(formatDue(card, { todayDayNumber: 2148, now: early, rolloverHour: 0 })).toBe(
+      '2026-11-29'
+    );
+  });
+
+  it('reports the due as unknown for cards in filtered decks', () => {
+    const card = { ...base, queue: 2, type: 2, due: -100_000 };
+    expect(formatDue(card, { todayDayNumber: 2148, now, inFilteredDeck: true })).toBe(
+      'unknown (in filtered deck)'
+    );
+  });
+
   it('keeps the raw day number when today is unknown', () => {
     expect(formatDue({ ...base, queue: 2, type: 2, due: 2152 })).toBe('day 2152');
   });
@@ -71,7 +88,7 @@ describe('cardState', () => {
   it('reports interval, reps, lapses and ease in percent', () => {
     const state = cardState(
       { ...base, queue: 2, type: 2, due: 2150, interval: 21, reps: 5, lapses: 1, factor: 2500 },
-      { todayDayNumber: 2150, now: new Date(2026, 10, 28) }
+      { todayDayNumber: 2150, now: new Date(2026, 10, 28, 12) }
     );
     expect(state).toEqual({
       cardId: 1,

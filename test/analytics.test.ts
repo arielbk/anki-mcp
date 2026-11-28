@@ -120,6 +120,9 @@ describe('answer aggregation', () => {
   it('computes interval stats ignoring learning intervals', () => {
     expect(intervalStats([-600, 3, 10, 30])).toEqual({ averageDays: 14.3, longestDays: 30 });
     expect(intervalStats([])).toEqual({ averageDays: null, longestDays: null });
+    // Far beyond the argument limit of Math.max(...spread).
+    const many = Array.from({ length: 500_000 }, (_, i) => (i % 100) + 1);
+    expect(intervalStats(many)).toEqual({ averageDays: 50.5, longestDays: 100 });
   });
 });
 
@@ -227,6 +230,8 @@ interface Fake {
   notes?: Array<{ noteId: number; tags: string[]; cards: number[] }>;
   cards?: Array<{ cardId: number; question: string; lapses: number; deckName: string }>;
   byDay?: Array<[string, number]>;
+  /** Card ID -> current deck, for getDecks. */
+  deckOf?: Record<number, string>;
 }
 
 function fakeClient(fake: Fake) {
@@ -249,6 +254,11 @@ function fakeClient(fake: Fake) {
           return fake.config ?? false;
         case 'getIntervals':
           return params.cards.map(() => 10);
+        case 'getDecks': {
+          const out: Record<string, number[]> = {};
+          for (const id of params.cards) (out[fake.deckOf?.[id] ?? 'Lang'] ??= []).push(id);
+          return out;
+        }
         case 'notesInfo':
           return fake.notes ?? [];
         case 'cardsInfo':
@@ -280,7 +290,7 @@ describe('scopes', () => {
   it('collection_stats returns compact structured JSON', async () => {
     const fake = baseFake();
     fake.findCards = (q) => {
-      if (q.includes('is:new')) return [11, 12];
+      if (q.endsWith(' is:new -is:suspended')) return [11, 12];
       if (q.includes('prop:ivl>=21')) return [3];
       if (q.includes('prop:ivl<21')) return [1, 2];
       if (q.includes('prop:due<=0')) return [2];
@@ -381,7 +391,58 @@ describe('scopes', () => {
       { tag: 'verbs', cards: 2, again: 2 },
       { tag: 'nouns', cards: 1, again: 1 },
     ]);
-    expect(multi).toHaveBeenCalledTimes(4);
+    // 3 rounds plus the filtered-deck check, which runs alongside the revlog.
+    expect(multi).toHaveBeenCalledTimes(5);
+  });
+
+  it('counts buried learning cards as learning so totals add up', async () => {
+    const fake = baseFake();
+    fake.findCards = (q) =>
+      q.endsWith('(is:learn OR (-is:new -is:review)) -is:suspended') ? [7, 8] : [];
+    const { client } = fakeClient(fake);
+    const out = JSON.parse(await collectionStats(client, { deckName: 'Lang', days: 1, now: NOW }));
+    expect(out.cardCounts).toMatchObject({ learning: 2, total: 2 });
+  });
+
+  it('chunks getIntervals requests', async () => {
+    const fake = baseFake();
+    const many = Array.from({ length: 2500 }, (_, i) => 1000 + i);
+    fake.findCards = (q) => (q.includes('prop:ivl<21') ? many : []);
+    const { client, multi } = fakeClient(fake);
+    const out = JSON.parse(await collectionStats(client, { days: 1, now: NOW }));
+    expect(out.intervals).toEqual({ averageDays: 10, longestDays: 10 });
+    const sizes = multi.mock.calls
+      .flatMap(([{ actions }]) => actions)
+      .filter((a) => a.action === 'getIntervals')
+      .map((a) => a.params.cards.length);
+    expect(sizes).toEqual([1000, 1000, 500]);
+  });
+
+  it('includes reviews of the deck’s cards that sit in a filtered deck', async () => {
+    const fake = baseFake();
+    fake.decks.push('Filtered Deck 1');
+    fake.todayCount = 5;
+    fake.reviewsByDeck['Filtered Deck 1'] = [
+      tuple(at(28, 8), 50, 1), // card of Lang, now in the filtered deck
+      tuple(at(28, 8, 30), 60, 1), // card of Other: must not count
+    ];
+    fake.deckOf = { 50: 'Filtered Deck 1' };
+    fake.findCards = (q) => (q === '"deck:Lang" deck:filtered' ? [50] : []);
+    const { client } = fakeClient(fake);
+    const text = await reviewsByDay(client, { deckName: 'Lang', days: 1, now: NOW });
+    expect(text).toContain('2026-11-28: 4');
+    const reviews = await cardReviews(client, { deckName: 'Lang', startTimestamp: 0 });
+    expect(reviews).toContain(' 50 1 ');
+    expect(reviews).not.toContain(' 60 1 ');
+  });
+
+  it('card_reviews includes subdecks', async () => {
+    const { client, calls } = fakeClient(baseFake());
+    const text = await cardReviews(client, { deckName: 'Lang', startTimestamp: 0 });
+    expect(text.split('\n')[0]).toBe(
+      '4 reviews for "Lang" (incl. subdecks) after 1970-01-01T00:00:00.000Z.'
+    );
+    expect(calls.filter((c) => c === 'cardReviews')).toHaveLength(2);
   });
 
   it('trouble_cards lists worst cards and respects limit', async () => {
@@ -422,11 +483,12 @@ describe('scopes', () => {
     );
     const { client } = fakeClient(fake);
     const small = await cardReviews(client, { deckName: 'Lang', startTimestamp: 0, limit: 100 });
-    expect(small.split('\n')).toHaveLength(52);
+    // 50 in Lang plus 1 in Lang::Verbs, a header and a column line.
+    expect(small.split('\n')).toHaveLength(53);
     const summary = JSON.parse(
       await cardReviews(client, { deckName: 'Lang', startTimestamp: 0, limit: 10 })
     );
-    expect(summary).toMatchObject({ reviews: 50, cards: 50, byEase: { good: 50 } });
+    expect(summary).toMatchObject({ reviews: 51, cards: 50, byEase: { good: 50, again: 1 } });
     expect(summary.howToNarrow).toMatch(/startTimestamp/);
   });
 });

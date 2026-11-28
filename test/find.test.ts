@@ -22,11 +22,38 @@ interface FakeCard {
   factor: number;
 }
 
+/** Evaluates the is:/deck:filtered terms find uses against one card, like Anki. */
+function matchesTerms(c: FakeCard, terms: string[]): boolean {
+  return terms.every((raw) => {
+    const neg = raw.startsWith('-');
+    const term = neg ? raw.slice(1) : raw;
+    const hit =
+      term === 'is:new'
+        ? c.type === 0
+        : term === 'is:review'
+          ? c.type === 2 || c.type === 3
+          : term === 'is:learn'
+            ? c.queue === 1 || c.queue === 3
+            : term === 'is:suspended'
+              ? c.queue === -1
+              : term === 'is:buried'
+                ? c.queue === -2 || c.queue === -3
+                : term === 'deck:filtered'
+                  ? c.deckName.startsWith('Filtered')
+                  : true;
+    return neg ? !hit : hit;
+  });
+}
+
 /**
  * In-memory collection; never talks to Anki. Every note has one card per
- * entry in `cards`. Queries: "all", "(all) is:new", "prop:due=k".
+ * entry in `cards`. Queries: "all" or "(all) <is: terms>", "cid:1,2 deck:filtered",
+ * "prop:due=k -deck:filtered".
  */
-function fakeCollection(count: number, opts: { today?: number; longText?: boolean } = {}) {
+function fakeCollection(
+  count: number,
+  opts: { today?: number; longText?: boolean; edit?: (c: FakeCard) => void } = {}
+) {
   const notes = [];
   const cards: FakeCard[] = [];
   for (let i = 0; i < count; i++) {
@@ -46,6 +73,7 @@ function fakeCollection(count: number, opts: { today?: number; longText?: boolea
         lapses: 0,
         factor: seen ? 2500 : 0,
       });
+      opts.edit?.(cards.at(-1)!);
     });
     notes.push({
       noteId,
@@ -58,7 +86,25 @@ function fakeCollection(count: number, opts: { today?: number; longText?: boolea
       },
     });
   }
-  const isNew = (c: FakeCard) => c.type === 0;
+  const search = (query: string): FakeCard[] => {
+    const cid = /^cid:([\d,]+) (.*)$/.exec(query);
+    if (cid) {
+      const ids = new Set(cid[1]!.split(',').map(Number));
+      return cards.filter((c) => ids.has(c.cardId) && matchesTerms(c, cid[2]!.split(' ')));
+    }
+    const due = /^prop:due=(-?\d+) -deck:filtered$/.exec(query);
+    if (due) {
+      if (opts.today === undefined) return [];
+      return cards.filter(
+        (c) =>
+          c.queue === 2 &&
+          c.due - opts.today! === Number(due[1]) &&
+          matchesTerms(c, ['-deck:filtered'])
+      );
+    }
+    const terms = query.replace(/^\(all\)\s*/, '').replace(/^all$/, '');
+    return cards.filter((c) => matchesTerms(c, terms ? terms.split(' ') : []));
+  };
   const client = {
     note: {
       findNotes: vi.fn(async () => notes.map((n) => n.noteId)),
@@ -67,9 +113,7 @@ function fakeCollection(count: number, opts: { today?: number; longText?: boolea
       ),
     },
     card: {
-      findCards: vi.fn(async ({ query }: { query: string }) =>
-        cards.filter((c) => (query.endsWith('is:new') ? isNew(c) : true)).map((c) => c.cardId)
-      ),
+      findCards: vi.fn(async ({ query }: { query: string }) => search(query).map((c) => c.cardId)),
       cardsInfo: vi.fn(async ({ cards: ids }: { cards: number[] }) =>
         ids.map((id) => cards.find((c) => c.cardId === id)!)
       ),
@@ -85,13 +129,16 @@ function fakeCollection(count: number, opts: { today?: number; longText?: boolea
       }),
     },
     miscellaneous: {
-      multi: vi.fn(async ({ actions }: { actions: Array<{ params: { query: string } }> }) =>
-        actions.map(({ params }) => {
-          const k = Number(params.query.replace('prop:due=', ''));
-          if (opts.today === undefined) return { result: [], error: null };
-          const hit = cards.filter((c) => c.queue === 2 && c.due - opts.today! === k);
-          return { result: hit.map((c) => c.cardId), error: null };
-        })
+      multi: vi.fn(
+        async ({ actions }: { actions: Array<{ action: string; params: { query: string } }> }) =>
+          actions.map(({ action, params }) => {
+            const hit = search(params.query);
+            const ids =
+              action === 'findNotes'
+                ? [...new Set(hit.map((c) => c.note))]
+                : hit.map((c) => c.cardId);
+            return { result: ids, error: null };
+          })
       ),
     },
   };
@@ -148,7 +195,7 @@ describe('find listing', () => {
     const text = await runFind(client, {
       query: 'all',
       include: ['tags', 'deck', 'model', 'state'],
-      now: new Date(2026, 10, 28),
+      now: new Date(2026, 10, 28, 12),
     });
     expect(text.split('\n')[1]).toBe(
       '1000 | tags: - | deck: Interview prep, Interview prep::Extra | model: Cloze | cards: 10000 review ivl=3d due=2026-11-30 reps=4 lapses=0 ease=250%; 10001 review ivl=3d due=2026-11-30 reps=4 lapses=0 ease=250%'
@@ -245,13 +292,40 @@ describe('find groupBy', () => {
     expect(mocks.card.cardsInfo).not.toHaveBeenCalled();
   });
 
-  it('counts per scheduling state', async () => {
-    const { client } = fakeCollection(6);
+  it('counts per scheduling state with searches, not cardsInfo', async () => {
+    const { client, mocks } = fakeCollection(6);
     const text = await runFind(client, { query: 'all', groupBy: 'state' });
     expect(text.split('\n').slice(1)).toEqual([
       'new: 5 cards, 4 notes',
       'review: 3 cards, 2 notes',
     ]);
+    expect(mocks.card.cardsInfo).not.toHaveBeenCalled();
+    expect(mocks.miscellaneous.multi).toHaveBeenCalledTimes(1);
+  });
+
+  it('splits learning, relearning, suspended and buried like queueLabel', async () => {
+    // Note 1000: buried learning card; 1001: relearning; 1002: suspended new;
+    // 1003: buried review; 1004: learning (day-learn queue).
+    const edits: Record<number, Partial<FakeCard>> = {
+      10000: { queue: -2, type: 1 },
+      10001: { queue: 1, type: 3 },
+      10010: { queue: 1, type: 3 },
+      10020: { queue: -1, type: 0 },
+      10030: { queue: -3, type: 2 },
+      10040: { queue: 3, type: 1 },
+    };
+    const { client } = fakeCollection(5, {
+      edit: (c) => Object.assign(c, edits[c.cardId] ?? {}),
+    });
+    const text = await runFind(client, { query: 'all', groupBy: 'state', format: 'json' });
+    const out = JSON.parse(text);
+    expect(out).toMatchObject({ notes: 5, cards: 6, new: 1, seen: 5 });
+    expect(out.groups).toEqual({
+      learning: { notes: 1, cards: 1, new: 0, seen: 1 },
+      relearning: { notes: 2, cards: 2, new: 0, seen: 2 },
+      suspended: { notes: 1, cards: 1, new: 1, seen: 0 },
+      buried: { notes: 2, cards: 2, new: 0, seen: 2 },
+    });
   });
 
   it('counts per deck and model', async () => {
@@ -276,21 +350,52 @@ describe('resolveToday', () => {
     expect(await resolveToday(client)).toBe(2149);
     expect(mocks.miscellaneous.multi).toHaveBeenCalledTimes(1);
   });
+
+  it('never anchors on cards in filtered decks', async () => {
+    const { client, mocks } = fakeCollection(1, { today: 2149 });
+    await resolveToday(client);
+    const { actions } = mocks.miscellaneous.multi.mock.calls[0]![0];
+    expect(actions.every((a) => a.params.query.endsWith(' -deck:filtered'))).toBe(true);
+  });
+
+  it('shows the due of cards in filtered decks as unknown', async () => {
+    const { client } = fakeCollection(4, {
+      today: 2148,
+      // Note 1003's card moved to a filtered deck; its due is a position.
+      edit: (c) => {
+        if (c.cardId === 10030) Object.assign(c, { deckName: 'Filtered Deck 1', due: -99_000 });
+      },
+    });
+    const text = await runFind(client, {
+      query: 'all',
+      include: ['state'],
+      now: new Date(2026, 10, 28, 12),
+    });
+    expect(text).toContain('10000 review ivl=3d due=2026-11-30');
+    expect(text).toContain('10030 review ivl=3d due=unknown (in filtered deck)');
+  });
 });
 
 describe('get_stats', () => {
+  const ids: Record<string, number> = {
+    Spanish: 105,
+    French: 106,
+    'Spanish::Verbs': 107,
+    'French::Verbs': 108,
+  };
   function statsClient(): DeckStatsClient & { deck: { getDeckStats: ReturnType<typeof vi.fn> } } {
     return {
       deck: {
-        deckNames: vi.fn(async () => ['Spanish', 'French']),
+        deckNamesAndIds: vi.fn(async () => ({ ...ids })),
+        // Keyed by ID with leaf names only, like AnkiConnect.
         getDeckStats: vi.fn(async ({ decks }: { decks: string[] }) =>
           Object.fromEntries(
-            decks.map((name, i) => [
-              String(100 + i),
+            decks.map((name) => [
+              String(ids[name]),
               {
-                deck_id: 100 + i,
-                name,
-                new_count: 5,
+                deck_id: ids[name]!,
+                name: name.split('::').pop()!,
+                new_count: ids[name]! % 10,
                 learn_count: 1,
                 review_count: 9,
                 total_in_deck: 50,
@@ -308,10 +413,19 @@ describe('get_stats', () => {
     expect(text.split('\n')).toEqual([
       'deck: cards total | due today: new, learning, review',
       'Spanish: 50 total | new 5, learning 1, review 9',
-      'French: 50 total | new 5, learning 1, review 9',
+      'French: 50 total | new 6, learning 1, review 9',
       'Not found: "Nope" (check names with manage_decks list)',
     ]);
     expect(client.deck.getDeckStats).toHaveBeenCalledWith({ decks: ['Spanish', 'French'] });
+  });
+
+  it('matches results by deck ID, not the (leaf) name', async () => {
+    const client = statsClient();
+    const text = await getDeckStatsText(client, undefined, ['French::Verbs', 'Spanish::Verbs']);
+    expect(text.split('\n').slice(1)).toEqual([
+      'French::Verbs: 50 total | new 8, learning 1, review 9',
+      'Spanish::Verbs: 50 total | new 7, learning 1, review 9',
+    ]);
   });
 
   it('accepts deckName and names both params when neither is given', async () => {

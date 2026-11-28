@@ -13,7 +13,7 @@ interface DeckStats {
 export interface DeckStatsClient {
   deck: {
     getDeckStats: (params: { decks: string[] }) => Promise<Record<string, DeckStats>>;
-    deckNames: () => Promise<string[]>;
+    deckNamesAndIds: () => Promise<Record<string, number>>;
   };
 }
 
@@ -32,7 +32,9 @@ export function resolveDeckNames(deckName?: string, deckNames?: string[]): strin
 /**
  * One line per deck. AnkiConnect's getDeckStats CREATES any deck name it
  * doesn't know (it resolves names with create=true), so unknown names are
- * filtered out first and reported instead. Results are keyed by deck ID.
+ * filtered out first and reported instead. Results are keyed by deck ID and
+ * carry only the leaf name (Spanish::Verbs and French::Verbs are both
+ * "Verbs"), so they are matched by ID.
  */
 export async function getDeckStatsText(
   client: DeckStatsClient,
@@ -40,20 +42,14 @@ export async function getDeckStatsText(
   deckNames?: string[]
 ): Promise<string> {
   const names = resolveDeckNames(deckName, deckNames);
-  const existing = new Set(await client.deck.deckNames());
-  const known = names.filter((n) => existing.has(n));
-  const missing = names.filter((n) => !existing.has(n));
+  const idsByName = await client.deck.deckNamesAndIds();
+  const known = names.filter((n) => idsByName[n] !== undefined);
+  const missing = names.filter((n) => idsByName[n] === undefined);
   const stats = known.length > 0 ? await client.deck.getDeckStats({ decks: known }) : {};
-  const byId = Object.values(stats);
   const lines = ['deck: cards total | due today: new, learning, review'];
   for (const name of known) {
-    // Results are keyed by deck ID, so match by name (or the leaf name, in case
-    // AnkiConnect shortens subdecks); with one deck there is no ambiguity.
-    const leaf = name.split('::').pop();
-    const s =
-      byId.find((x) => x.name === name) ??
-      byId.find((x) => x.name === leaf) ??
-      (known.length === 1 ? byId[0] : undefined);
+    const id = idsByName[name];
+    const s = stats[String(id)] ?? Object.values(stats).find((x) => x.deck_id === id);
     if (!s) {
       missing.push(name);
       continue;

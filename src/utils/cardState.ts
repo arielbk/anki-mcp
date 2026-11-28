@@ -1,3 +1,5 @@
+import { addDays, dayKey, DEFAULT_ROLLOVER_HOUR } from '../analytics/aggregate.js';
+
 /**
  * Maps AnkiConnect `cardsInfo` scheduling fields to readable state.
  *
@@ -37,7 +39,7 @@ export interface CardState {
   queue: QueueLabel;
   /** Current interval in days (0 for new/learning). */
   ivl: number;
-  /** ISO date (review/day-learn when today's day number is known), ISO datetime (learning), `#n` new-queue position, or `day n` raw day number. */
+  /** ISO date (review/day-learn when today's day number is known), ISO datetime (learning), `#n` new-queue position, `day n` raw day number, or `unknown (in filtered deck)`. */
   due: string;
   reps: number;
   lapses: number;
@@ -77,28 +79,33 @@ export function dueIsDayNumber(card: Pick<SchedulingFields, 'queue' | 'type'>): 
   return card.queue < 0 && card.type === 2;
 }
 
-function isoDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 export interface DueContext {
   /** Anki's day number for today, if known (see find's resolveToday). */
   todayDayNumber?: number | undefined;
   /** Current time, injectable for tests. */
   now?: Date | undefined;
+  /** Hour Anki's day starts; defaults to Anki's 4am. */
+  rolloverHour?: number | undefined;
+  /**
+   * The card sits in a filtered deck. cardsInfo then reports the filtered
+   * deck's position instead of the review due (and no original due), so the
+   * date can't be derived.
+   */
+  inFilteredDeck?: boolean | undefined;
 }
+
+export const FILTERED_DUE = 'unknown (in filtered deck)';
 
 export function formatDue(card: SchedulingFields, ctx: DueContext = {}): string {
   const now = ctx.now ?? new Date();
   if (card.queue === 0 || (card.queue < 0 && card.type === 0)) return `#${card.due}`;
   if (dueIsDayNumber(card)) {
+    if (ctx.inFilteredDeck) return FILTERED_DUE;
     if (ctx.todayDayNumber === undefined) return `day ${card.due}`;
-    const date = new Date(now);
-    date.setDate(date.getDate() + (card.due - ctx.todayDayNumber));
-    return isoDate(date);
+    // Anki's "today" is the calendar date of (now - rollover hour), so between
+    // midnight and the rollover it is still yesterday.
+    const today = dayKey(now.getTime(), ctx.rolloverHour ?? DEFAULT_ROLLOVER_HOUR);
+    return addDays(today, card.due - ctx.todayDayNumber);
   }
   if (card.queue === 1 || card.queue === 4 || card.type === 1 || card.type === 3) {
     // Intraday learning: due is epoch seconds.
