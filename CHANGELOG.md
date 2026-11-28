@@ -8,6 +8,8 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-28
+
 ### Added
 
 - `manage_flashcards` `find` takes `include` (`fields`, `tags`, `deck`, `model`, `cards`,
@@ -172,7 +174,8 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 - Expanded server functionality and development tooling.
 
-[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/arielbk/anki-mcp/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/arielbk/anki-mcp/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/arielbk/anki-mcp/compare/v0.7.0...v1.1.0
 [0.7.0]: https://github.com/arielbk/anki-mcp/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/arielbk/anki-mcp/compare/v0.5.0...v0.6.0
