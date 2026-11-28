@@ -69,17 +69,19 @@ Operations:
 - move_cards: needs cardIds and targetDeck.
 - delete: needs deckNames. Permanently deletes the decks AND all their cards (deleteCards must not be false; AnkiConnect always deletes cards). Cannot be undone.`,
 
-  get_analytics: `Read-only study statistics and review history from the local Anki collection. Use this for reporting and diagnosing progress; it never changes data. To act on the findings, use study_session or manage_flashcards.
+  get_analytics: `Read-only study statistics and review history from the local Anki collection, aggregated server-side into compact JSON or one line per row. Use this for reporting and diagnosing progress; it never changes data. To act on the findings, use study_session or manage_flashcards.
 
-Scopes (set \`scope\`, then the listed parameters):
-- deck_stats: needs deckName; new/learning/review counts.
-- collection_stats: optional wholeCollection (default true); returns Anki's HTML statistics report (large).
-- reviews_by_day: review counts per day for the whole history.
-- reviews_today: number of cards reviewed today.
-- card_reviews: needs deckName and startTimestamp (review ID / epoch milliseconds); all reviews after it.
+Scopes (set \`scope\`, then the listed parameters). deckName always includes subdecks; where optional, omitting it means the whole collection:
+- deck_overview: needs deckName; optional days (default 30), limit (top tags, default 10). One-call answer to "how am I doing on this deck": new/learning/review/suspended and seen/unseen counts, the preset's new/day and reviews/day limits, the date the unseen cards run out at the new/day limit, reviews, correct % and retention over the window, and top tags by Again count.
+- collection_stats: optional deckName, days (forecast length, default 14). Studied today (cards, minutes, again, correct %), card counts (new/learning/young/mature/suspended; mature = interval >= 21d), correct % by card type over the last 30 days, due-review forecast per day, average/longest interval.
+- reviews_by_day: optional deckName, days (default 30) or since (YYYY-MM-DD). One "YYYY-MM-DD: n" line per day (zero days included) plus a total.
+- trouble_cards: optional deckName, days (default 7), limit (default 10). Cards answered Again in the window, grouped by tag, plus the worst cards (cardId, front text, again count, lapses).
+- deck_stats: needs deckName; Anki's new/learning/review counts for the deck.
+- reviews_today: number of reviews today across all decks.
+- card_reviews: needs deckName and startTimestamp (epoch ms); raw review log for that deck (not subdecks), one line per review. Over limit (default 300) rows it returns a summary and how to narrow.
 - card_details: needs cardIds; ease factor and current interval per card.
 
-Prefer the narrowest scope; collection_stats and card_reviews can return large payloads.`,
+For "what am I failing", trouble_cards gives the aggregate; to get the cards themselves use manage_flashcards find with Anki search syntax, e.g. "rated:2:1" (answered Again in the last 2 days), "deck:Spanish rated:7:1", "prop:lapses>3" or "is:due".`,
 
   manage_models: `List and modify Anki note types (models): fields, card templates and CSS. Use list before creating notes to find a note type's exact field names (e.g. "Front"/"Back"); use manage_flashcards for note content.
 

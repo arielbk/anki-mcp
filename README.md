@@ -296,7 +296,24 @@ If the deck uses a shared preset, it is cloned into a new preset named after the
 
 ### 📊 **Get Analytics** (`get_analytics`)
 
-Dive into your study statistics, review history, and learning patterns.
+Study statistics aggregated by the server into compact JSON or one line per row (never Anki's HTML stats page). `deckName` includes subdecks; where it is optional, omitting it covers the whole collection.
+
+| Scope              | Parameters                                       | Returns                                                                                                                                                                                                                                |
+| ------------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deck_overview`    | `deckName`, `days` (30), `limit` (10)            | Counts (new/learning/review/suspended, seen vs unseen), the preset's new/day and reviews/day limits, the date the unseen cards run out at the new/day limit, reviews, correct % and retention over the window, top tags by Again count |
+| `collection_stats` | `deckName?`, `days` (forecast, 14)               | Studied today, card counts (new/learning/young/mature/suspended), correct % by card type over 30 days, due forecast per day, average/longest interval                                                                                  |
+| `reviews_by_day`   | `deckName?`, `days` (30) or `since` (YYYY-MM-DD) | `2026-11-28: 91` lines including zero days, plus a total                                                                                                                                                                               |
+| `trouble_cards`    | `deckName?`, `days` (7), `limit` (10)            | Cards answered Again in the window grouped by tag, and the worst cards (front text, again count, lapses)                                                                                                                               |
+| `deck_stats`       | `deckName`                                       | Anki's deck counts                                                                                                                                                                                                                     |
+| `reviews_today`    | –                                                | Reviews today                                                                                                                                                                                                                          |
+| `card_reviews`     | `deckName`, `startTimestamp`, `limit` (300)      | Raw review log, one line per review; a summary with narrowing hints when over `limit`                                                                                                                                                  |
+| `card_details`     | `cardIds`                                        | Ease factor and interval per card                                                                                                                                                                                                      |
+
+```json
+{ "scope": "deck_overview", "deckName": "Interview prep" }
+```
+
+For the failing cards themselves, use `manage_flashcards` `find` with Anki search syntax, e.g. `rated:2:1` (answered Again in the last two days).
 
 ### 🎨 **Manage Models** (`manage_models`)
 
