@@ -276,6 +276,29 @@ Capital of France,Paris,geography
 }
 ```
 
+#### Searching (`find`)
+
+`find` takes any Anki search query and returns compact results: the total match count, the next offset, and one line per note. Use `include` to choose what each note carries (`fields`, `tags`, `deck`, `model`, `cards`, `state`). The default is `["fields"]`, with HTML stripped and each field cut to `maxFieldChars` (default 120). `state` adds each card's queue (new, learning, review, relearning, suspended or buried), interval, due date, reps, lapses and ease. `includeDetails: true` still works and means all of these.
+
+```json
+{ "operation": "find", "query": "rated:2:1", "include": ["tags", "state"] }
+```
+
+For counts, use `groupBy` (`tag`, `deck`, `model` or `state`). It covers every match, not just one page:
+
+```json
+{ "operation": "find", "query": "deck:\"Interview prep\"", "groupBy": "tag" }
+```
+
+```
+166 notes, 166 cards (126 new, 40 seen) match "deck:\"Interview prep\""; 27 tag groups
+infra: 96 notes, 96 cards, 56 new, 40 seen
+postgres: 44 notes, 44 cards, 4 new, 40 seen
+...
+```
+
+Listings are capped at about 20k characters. Past that you get the notes that fit, the total, and a hint to narrow the query. `format: "json"` returns single-line JSON instead. Handy queries: `rated:2:1` (answered Again in the last 2 days), `is:new`, `is:due`, `prop:ivl>=21` (mature), `prop:lapses>=3`, `deck:"Name"`, `tag:name`.
+
 ### 🎯 **Study Sessions** (`study_session`)
 
 Run interactive quiz sessions, manage card scheduling, and track which cards need review.
@@ -283,6 +306,8 @@ Run interactive quiz sessions, manage card scheduling, and track which cards nee
 ### 📚 **Manage Decks** (`manage_decks`)
 
 Create and organize decks, move cards around, and configure deck settings.
+
+`get_stats` takes `deckName` or `deckNames` (an array) and returns one line per deck with the total card count and today's new, learning and review due counts. Unknown deck names are reported, not created.
 
 #### Per-deck daily limits
 

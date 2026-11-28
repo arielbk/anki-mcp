@@ -8,6 +8,31 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
 
 ## [Unreleased]
 
+### Added
+
+- `manage_flashcards` `find` takes `include` (`fields`, `tags`, `deck`, `model`, `cards`,
+  `state`) to choose what each note carries, plus `maxFieldChars` (default 120) for field
+  text, which now has its HTML stripped. `state` reports each card's queue, interval, due
+  date, reps, lapses and ease.
+- `find` `groupBy` (`tag`, `deck`, `model`, `state`) returns counts over all matches
+  (notes, cards, new and seen per group) instead of a listing.
+- `find` `format: "json"` returns single-line JSON.
+- `manage_decks` `get_stats` accepts `deckNames` (an array) as well as `deckName`.
+
+### Changed
+
+- `find` output is compact by default: one line per note with truncated field text, instead
+  of IDs only (`include: []`) or pretty-printed JSON (`includeDetails`). Every listing shows
+  the total and the next offset. Output is capped at about 20k characters, with a hint to
+  narrow the query. `includeDetails: true` still works and now means every `include` option.
+- `get_stats` returns one line per deck instead of pretty-printed JSON.
+
+### Fixed
+
+- `get_stats` no longer creates a deck when given a name that doesn't exist. AnkiConnect's
+  `getDeckStats` creates unknown decks, so names are now checked first and missing ones
+  reported.
+
 ## [1.1.0] - 2026-11-27
 
 ### Changed

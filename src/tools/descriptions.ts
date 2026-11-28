@@ -38,7 +38,12 @@ Operations (set \`operation\`, then the listed parameters):
 - create_batch: add many notes. Give \`notes\` inline OR \`filePath\` to a .json (array of notes), .csv or .tsv file (header row = field names; optional tags, deck, model columns). Top-level deckName/modelName act as defaults that each note can override; top-level tags are added to every note. Notes are validated first (note type exists, field names match, duplicates, empty first field: each failure gets a reason), then sent sequentially in chunks of chunkSize (default 10). The result maps every note (#n plus the first ~40 chars of its first field) to its new note ID or failure reason. If Anki stops responding partway, it stops and lists which notes were saved and which to resend. Use dryRun: true to validate without writing. Prefer filePath for large imports: it keeps card text out of the conversation.
 - update: change fields and/or replace tags of one note. Needs noteId plus fields and/or tags.
 - delete: permanently delete notes and all their cards. Needs noteIds. Cannot be undone.
-- find: read-only search with Anki query syntax (e.g. "deck:Spanish tag:verbs"). Needs query; optional limit (default 50), offset, includeDetails.
+- find: read-only search with Anki query syntax. Needs query. Output is compact: a header with the total match count and next offset, then one line per note. Optional:
+  - include: what each note carries. Default ["fields"] (field text, HTML stripped, each field cut to maxFieldChars, default 120; 0 = no limit). Add "tags", "deck", "model", "cards" (card IDs) or "state" (per card: new/learning/review/relearning/suspended/buried, interval, due date, reps, lapses, ease). [] returns IDs only. includeDetails: true = all of them.
+  - groupBy: "tag" | "deck" | "model" returns {notes, cards, new, seen} per group, and "state" returns card/note counts per queue, over ALL matches (ignores limit). Use this for "how many cards per topic" or "how much of this deck have I seen" instead of listing.
+  - limit (default 50), offset, format ("lines" default, or "json" for single-line JSON).
+  Listings are capped at ~20k chars: past that you get the first notes that fit plus a hint to use groupBy, include or a narrower query/limit.
+  Search power-ups: deck:"Interview prep", tag:verbs, is:new, is:due, is:suspended, rated:2:1 (answered Again in the last 2 days; the go-to for "what am I failing"), rated:7 (reviewed in the last 7 days), prop:ivl>=21 (mature), prop:lapses>=3 (leeches), added:7, "front:*word*". Combine with spaces (AND), "or", and "-" for NOT.
 - get_info: read-only card details. Needs cardIds (max 50).
 - add_tags / remove_tags: needs noteIds and tags.
 - clear_empty: deletes every note with empty cards in the whole collection.
@@ -63,7 +68,7 @@ Operations:
 - list: read-only; all deck names and IDs.
 - create: needs deckName (use "Parent::Child" for subdecks). Optional newPerDay and/or reviewsPerDay give the new deck its own daily limits (see set_limits). Does nothing if the deck already exists.
 - set_limits: needs deckName plus newPerDay and/or reviewsPerDay. Changes daily limits for this deck only: if the deck uses a shared options preset (e.g. "Default"), the preset is cloned into a new preset named after the deck, assigned to the deck, and only the clone is changed. Other decks are never affected.
-- get_stats: read-only; needs deckName.
+- get_stats: read-only; deckName (one deck) or deckNames (array). One line per deck: total cards and today's new/learning/review due counts. Unknown names are reported, never created. For counts by tag or state within a deck, use manage_flashcards find with groupBy.
 - get_config: read-only; needs deckName; returns the deck's options preset.
 - set_config: needs deckNames and configId; assigns an existing options preset to the decks.
 - move_cards: needs cardIds and targetDeck.

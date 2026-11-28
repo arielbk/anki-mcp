@@ -9,7 +9,15 @@ import {
   type NoteInput,
 } from '../utils/batch.js';
 import { formatDeckLimits, setDeckLimits } from '../utils/deckLimits.js';
+import { getDeckStatsText } from '../utils/deckStats.js';
 import { InputError, errorMessage, explainWriteFailure } from '../utils/errors.js';
+import {
+  DEFAULT_MAX_FIELD_CHARS,
+  GROUP_BY_KEYS,
+  INCLUDE_KEYS,
+  runFind,
+  type FindClient,
+} from '../utils/find.js';
 import { readNotesFile, resolveFilePath } from '../utils/notesFile.js';
 import {
   DESCRIPTIONS,
@@ -163,13 +171,44 @@ export function registerConsolidatedTools(server: McpServer) {
         query: z
           .string()
           .optional()
-          .describe('find: Anki search query, e.g. "deck:Spanish tag:verbs added:7"'),
+          .describe(
+            'find: Anki search query, e.g. \'deck:"Spanish" tag:verbs\', "is:new", "rated:2:1" (answered Again in the last 2 days), "prop:ivl>=21"'
+          ),
+        include: z
+          .array(z.enum(INCLUDE_KEYS))
+          .optional()
+          .describe(
+            'find: what each listed note carries (default ["fields"]; [] = IDs only). fields = field text (HTML stripped, truncated), tags, deck, model, state = per-card queue/interval/due/reps/lapses/ease, cards = card IDs'
+          ),
         includeDetails: z
           .boolean()
           .optional()
-          .describe('find: include full note fields/tags instead of only IDs (larger output)'),
-        limit: z.number().optional().describe('find: max results per page (default 50)'),
-        offset: z.number().optional().describe('find: results to skip, for paging (default 0)'),
+          .describe('find: shorthand for include: all of fields, tags, deck, model, state, cards'),
+        maxFieldChars: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe(
+            `find: truncate each field to this many characters (default ${DEFAULT_MAX_FIELD_CHARS}; 0 = no limit)`
+          ),
+        groupBy: z
+          .enum(GROUP_BY_KEYS)
+          .optional()
+          .describe(
+            'find: return counts per tag/deck/model ({notes, cards, new, seen}) or per scheduling state, over ALL matches, instead of a listing'
+          ),
+        format: z
+          .enum(['lines', 'json'])
+          .optional()
+          .describe('find: "lines" (default, one line per note/group) or compact single-line JSON'),
+        limit: z.number().int().min(1).optional().describe('find: max notes per page (default 50)'),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('find: notes to skip, for paging (default 0); use the returned next offset'),
 
         // get_info
         cardIds: z.array(z.number()).optional().describe('get_info: card IDs (max 50)'),
@@ -191,9 +230,13 @@ export function registerConsolidatedTools(server: McpServer) {
         noteId,
         noteIds,
         query,
+        include,
         includeDetails,
-        limit = 50,
-        offset = 0,
+        maxFieldChars,
+        groupBy,
+        format,
+        limit,
+        offset,
         cardIds,
       },
       ctx
@@ -320,37 +363,21 @@ export function registerConsolidatedTools(server: McpServer) {
 
           case 'find': {
             if (!query) {
-              throw new InputError('find requires query parameter');
+              throw new InputError(
+                'find requires query (Anki search syntax, e.g. deck:"Spanish" or is:new)'
+              );
             }
-            const foundNoteIds = await ankiClient.note.findNotes({ query });
-            const totalResults = foundNoteIds.length;
-
-            // Apply pagination
-            const paginatedIds = foundNoteIds.slice(offset, offset + limit);
-            const hasMore = offset + limit < totalResults;
-
-            let result = `Found ${totalResults} total flashcard(s) matching "${query}"`;
-            result += `\nShowing results ${offset + 1}-${offset + paginatedIds.length} of ${totalResults}`;
-
-            if (hasMore) {
-              result += `\n⚠️  More results available. Use offset=${offset + limit} to see next page.`;
-            }
-
-            if (includeDetails && paginatedIds.length > 0) {
-              const notesInfo = await ankiClient.note.notesInfo({ notes: paginatedIds });
-              result += `\n\nDetails:\n${JSON.stringify(notesInfo, null, 2)}`;
-            } else if (paginatedIds.length > 0) {
-              result += `\n\nIDs: [${paginatedIds.join(', ')}]`;
-            }
-
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: result,
-                },
-              ],
-            };
+            const text = await runFind(ankiClient as unknown as FindClient, {
+              query,
+              include,
+              includeDetails,
+              maxFieldChars,
+              groupBy,
+              format,
+              limit,
+              offset,
+            });
+            return { content: [{ type: 'text', text }] };
           }
 
           case 'get_info': {
@@ -645,7 +672,7 @@ export function registerConsolidatedTools(server: McpServer) {
         deckNames: z
           .array(z.string())
           .optional()
-          .describe('delete/set_config: deck names to act on'),
+          .describe('delete/set_config: deck names to act on. get_stats: several decks at once'),
         deleteCards: z
           .boolean()
           .optional()
@@ -771,18 +798,8 @@ export function registerConsolidatedTools(server: McpServer) {
           }
 
           case 'get_stats': {
-            if (!deckName) {
-              throw new InputError('get_stats requires deckName');
-            }
-            const stats = await ankiClient.deck.getDeckStats({ decks: [deckName] });
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Statistics for "${deckName}":\n${JSON.stringify(stats, null, 2)}`,
-                },
-              ],
-            };
+            const text = await getDeckStatsText(ankiClient, deckName, deckNames);
+            return { content: [{ type: 'text', text }] };
           }
 
           case 'move_cards': {
