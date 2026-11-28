@@ -1,5 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import {
+  cardReviews,
+  collectionStats,
+  deckOverview,
+  reviewsByDay,
+  troubleCards,
+} from '../analytics/scopes.js';
+import { assertDeckExists } from '../analytics/anki.js';
 import { ankiClient } from '../utils/ankiClient.js';
 import {
   DEFAULT_CHUNK_SIZE,
@@ -869,16 +877,45 @@ export function registerConsolidatedTools(server: McpServer) {
       inputSchema: z.object({
         scope: z
           .enum([
-            'deck_stats',
+            'deck_overview',
             'collection_stats',
             'reviews_by_day',
+            'trouble_cards',
+            'deck_stats',
             'reviews_today',
             'card_reviews',
             'card_details',
           ])
           .describe('Which statistics to read; see the tool description for required parameters'),
 
-        deckName: z.string().optional().describe('deck_stats/card_reviews: deck name'),
+        deckName: z
+          .string()
+          .optional()
+          .describe(
+            'Deck (includes subdecks). Required for deck_overview, deck_stats, card_reviews; optional filter for collection_stats, reviews_by_day, trouble_cards (omit = whole collection)'
+          ),
+        days: z
+          .number()
+          .int()
+          .min(1)
+          .max(3660)
+          .optional()
+          .describe(
+            'collection_stats: forecast length (default 14, max 90); reviews_by_day: days back incl. today (default 30); deck_overview: stats window (default 30); trouble_cards: window (default 7)'
+          ),
+        since: z
+          .string()
+          .optional()
+          .describe('reviews_by_day: start date YYYY-MM-DD (overrides days)'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(2000)
+          .optional()
+          .describe(
+            'trouble_cards: worst cards listed (default 10); deck_overview: top tags (default 10); card_reviews: max rows before summarizing (default 300)'
+          ),
         cardIds: z.array(z.number()).optional().describe('card_details: card IDs'),
         startTimestamp: z
           .number()
@@ -889,83 +926,44 @@ export function registerConsolidatedTools(server: McpServer) {
         wholeCollection: z
           .boolean()
           .optional()
-          .describe(
-            'collection_stats: true (default) for all decks, false for the current deck only'
-          ),
+          .describe('Deprecated and ignored; collection_stats uses deckName (omit for all decks)'),
       }),
     },
-    async ({ scope, deckName, cardIds, startTimestamp, wholeCollection }) => {
+    async ({ scope, deckName, cardIds, startTimestamp, days, since, limit }) => {
+      const text = (value: string) => ({ content: [{ type: 'text' as const, text: value }] });
       try {
         switch (scope) {
+          case 'deck_overview':
+            return text(await deckOverview(ankiClient, { deckName, days, limit }));
+
+          case 'collection_stats':
+            if (days !== undefined && days > 90) {
+              throw new InputError('collection_stats forecasts at most 90 days');
+            }
+            return text(await collectionStats(ankiClient, { deckName, days }));
+
+          case 'reviews_by_day':
+            return text(await reviewsByDay(ankiClient, { deckName, days, since }));
+
+          case 'trouble_cards':
+            return text(await troubleCards(ankiClient, { deckName, days, limit }));
+
+          case 'card_reviews':
+            return text(await cardReviews(ankiClient, { deckName, startTimestamp, limit }));
+
           case 'deck_stats': {
             if (!deckName) {
               throw new InputError('deck_stats requires deckName');
             }
+            // getDeckStats creates unknown decks, so validate the name first.
+            assertDeckExists(await ankiClient.deck.deckNames(), deckName);
             const stats = await ankiClient.deck.getDeckStats({ decks: [deckName] });
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `📊 Statistics for "${deckName}":\n${JSON.stringify(stats, null, 2)}`,
-                },
-              ],
-            };
-          }
-
-          case 'collection_stats': {
-            const statsHTML = await ankiClient.statistic.getCollectionStatsHTML({
-              wholeCollection: wholeCollection ?? true,
-            });
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `📊 Collection Statistics (${wholeCollection ? 'all decks' : 'current deck'}):\n${statsHTML}`,
-                },
-              ],
-            };
-          }
-
-          case 'reviews_by_day': {
-            const reviewsByDay = await ankiClient.statistic.getNumCardsReviewedByDay();
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `📊 Reviews by day (${reviewsByDay.length} days):\n${JSON.stringify(reviewsByDay, null, 2)}`,
-                },
-              ],
-            };
+            return text(`Statistics for "${deckName}": ${JSON.stringify(stats)}`);
           }
 
           case 'reviews_today': {
             const count = await ankiClient.statistic.getNumCardsReviewedToday();
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `📊 Cards reviewed today: ${count}`,
-                },
-              ],
-            };
-          }
-
-          case 'card_reviews': {
-            if (!deckName || startTimestamp === undefined) {
-              throw new InputError('card_reviews requires deckName and startTimestamp');
-            }
-            const reviews = await ankiClient.statistic.cardReviews({
-              deck: deckName,
-              startID: startTimestamp,
-            });
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `📊 Found ${reviews.length} reviews for "${deckName}" after ${startTimestamp}:\n${JSON.stringify(reviews, null, 2)}`,
-                },
-              ],
-            };
+            return text(`Reviews today (all decks): ${count}`);
           }
 
           case 'card_details': {
@@ -976,21 +974,12 @@ export function registerConsolidatedTools(server: McpServer) {
               ankiClient.card.getEaseFactors({ cards: cardIds }),
               ankiClient.card.getIntervals({ cards: cardIds, complete: false }),
             ]);
-
             const details = cardIds.map((id, idx) => ({
               cardId: id,
               easeFactor: easeFactors[idx],
               currentInterval: intervals[idx],
             }));
-
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `📊 Card details:\n${JSON.stringify(details, null, 2)}`,
-                },
-              ],
-            };
+            return text(JSON.stringify(details));
           }
 
           default:

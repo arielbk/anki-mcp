@@ -18,6 +18,13 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
   (notes, cards, new and seen per group) instead of a listing.
 - `find` `format: "json"` returns single-line JSON.
 - `manage_decks` `get_stats` accepts `deckNames` (an array) as well as `deckName`.
+- `get_analytics` scope `deck_overview`: one call for a deck's counts (seen vs unseen), its
+  preset's daily limits, the date the unseen cards run out at the new/day limit, recent
+  retention and the top tags by Again count.
+- `get_analytics` scope `trouble_cards`: cards answered Again in the last `days`, grouped by
+  tag, with the worst cards listed.
+- `reviews_by_day` takes `days` (default 30), `since` and `deckName`, and returns one
+  `YYYY-MM-DD: n` line per day, zero days included, plus a total.
 
 ### Changed
 
@@ -26,6 +33,13 @@ release for the `vX.Y.Z` tag: the Publish workflow ships it to npm and the MCP r
   the total and the next offset. Output is capped at about 20k characters, with a hint to
   narrow the query. `includeDetails: true` still works and now means every `include` option.
 - `get_stats` returns one line per deck instead of pretty-printed JSON.
+- `collection_stats` returns structured JSON (studied today, card counts, correct % by card
+  type, due forecast, intervals) instead of Anki's HTML report, and takes `deckName`
+  instead of depending on the deck selected in Anki. `wholeCollection` is ignored.
+- `card_reviews` prints one line per review and returns a summary with narrowing hints when
+  there are more than `limit` (default 300) reviews. Other scopes return unindented JSON.
+- Deck-scoped analytics reject unknown deck names with a "did you mean" hint before calling
+  AnkiConnect, since `getDeckStats` and `cardReviews` silently create missing decks.
 
 ### Fixed
 
